@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Chat from "./pages/Chat";
+import AIChat from "./pages/AIChat";
 import Dashboard from "./pages/Dashboard";
 import VibeCoder from "./pages/VibeCoder";
 import NotFound from "./pages/NotFound";
@@ -18,7 +19,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<AIChat />} />
+          <Route path="/landing" element={<Index />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/vibecoder" element={<VibeCoder />} />
