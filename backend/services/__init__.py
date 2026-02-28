@@ -1,3 +1,10 @@
+from .weave_tracing import (
+    get_performance_summary,
+    get_recent_traces,
+    get_improvement_data,
+    get_trace_ctx,
+    load_traces_from_redis,
+)
 from .router import classify_intent
 from .blitz import run_blitz_workflow, emit_event, get_session_state
 from .places import search_businesses
@@ -17,4 +24,9 @@ __all__ = [
     "generate_tts_audio",
     "run_demo_workflow",
     "generate_chat_response",
+    "get_performance_summary",
+    "get_recent_traces",
+    "get_improvement_data",
+    "get_trace_ctx",
+    "load_traces_from_redis",
 ]

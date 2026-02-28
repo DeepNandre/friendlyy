@@ -9,6 +9,7 @@ from typing import Optional
 
 from core import get_http_client, settings
 from core.redis_client import get_cached_audio, cache_audio
+from services.weave_tracing import traced, log_tts_generation, get_trace_ctx
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,19 @@ VOICE_SETTINGS = {
 }
 
 
+def _log_tts(*, result, duration, error, args, kwargs, ctx):
+    """Log callback for generate_tts_audio."""
+    text = args[0] if args else kwargs.get("text", "")
+    log_tts_generation(
+        text_length=len(text),
+        duration=duration,
+        cache_hit=ctx.get("cache_hit", False),
+        success=result is not None,
+        error=error,
+    )
+
+
+@traced("generate_tts_audio", log_fn=_log_tts)
 async def generate_tts_audio(
     text: str,
     voice_id: Optional[str] = None,
@@ -51,6 +65,7 @@ async def generate_tts_audio(
         cached = await get_cached_audio(text)
         if cached:
             logger.info(f"TTS cache hit for text: {text[:30]}...")
+            get_trace_ctx()["cache_hit"] = True
             return cached
 
     # Check for API key

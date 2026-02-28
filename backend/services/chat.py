@@ -7,6 +7,7 @@ import logging
 from typing import Optional
 
 from core import get_http_client, settings
+from services.weave_tracing import traced, log_chat_response
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,19 @@ When users want to build something - guide them to VibeCoder.
 Do NOT make up information. If you don't know something, say so."""
 
 
+def _log_chat(*, result, duration, error, args, kwargs, ctx):
+    """Log callback for generate_chat_response."""
+    user_message = args[0] if args else kwargs.get("user_message", "")
+    log_chat_response(
+        user_message=user_message,
+        response_text=result or "",
+        duration=duration,
+        success=error is None,
+        error=error,
+    )
+
+
+@traced("generate_chat_response", log_fn=_log_chat)
 async def generate_chat_response(
     user_message: str,
     conversation_history: Optional[list] = None,

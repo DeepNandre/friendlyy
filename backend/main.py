@@ -17,7 +17,8 @@ from slowapi.errors import RateLimitExceeded
 from core import settings
 from core.http_client import http_client_lifespan, close_http_client
 from core.redis_client import close_redis_client
-from api import chat_router, blitz_router, stream_router, webhooks_router
+from api import chat_router, blitz_router, stream_router, webhooks_router, traces_router
+from services.weave_tracing import load_traces_from_redis
 
 # Configure logging
 logging.basicConfig(
@@ -47,8 +48,15 @@ async def lifespan(app: FastAPI):
             import weave
             weave.init(settings.weave_project)
             logger.info(f"W&B Weave initialized: {settings.weave_project}")
+            logger.info("Weave tracing active on all agent services")
         except Exception as e:
             logger.warning(f"Failed to initialize Weave: {e}")
+    else:
+        logger.info("W&B Weave not configured (WANDB_API_KEY not set)")
+        logger.info("Traces will be stored locally and in Redis")
+
+    # Hydrate in-memory trace store from Redis
+    await load_traces_from_redis()
 
     yield
 
@@ -89,6 +97,7 @@ app.include_router(chat_router, prefix="/api", tags=["chat"])
 app.include_router(blitz_router, prefix="/api/blitz", tags=["blitz"])
 app.include_router(stream_router, prefix="/api/blitz", tags=["stream"])
 app.include_router(webhooks_router, prefix="/api/blitz", tags=["webhooks"])
+app.include_router(traces_router, prefix="/api", tags=["traces"])
 
 
 @app.get("/")
@@ -116,6 +125,11 @@ async def api_root():
             "POST /api/chat": "Send a message to the agent",
             "GET /api/blitz/stream/{session_id}": "Stream real-time call updates",
             "GET /api/blitz/session/{session_id}": "Get session status",
+            "GET /api/traces": "Traces dashboard (performance, improvement, recent)",
+            "GET /api/traces/performance": "Aggregate performance metrics",
+            "GET /api/traces/improvement": "Self-improvement data over time",
+            "GET /api/traces/recent": "Recent traces (filterable by operation)",
+            "GET /api/traces/blitz": "Blitz-specific traces and insights",
         },
         "documentation": "/docs",
     }

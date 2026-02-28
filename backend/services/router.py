@@ -9,6 +9,7 @@ from typing import Optional
 
 from core import get_http_client, settings
 from models import AgentType, RouterParams, RouterResult
+from services.weave_tracing import traced, log_router_classification
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,27 @@ User: "what can you do?"
 Output ONLY the JSON, no explanation or markdown."""
 
 
+def _log_classify(*, result, duration, error, args, kwargs, ctx):
+    """Log callback for classify_intent — extracts domain data from result."""
+    user_message = args[0] if args else kwargs.get("user_message", "")
+    if result:
+        log_router_classification(
+            user_message=user_message,
+            classified_agent=result.agent.value,
+            confidence=result.confidence,
+            duration=duration,
+            params=result.params.model_dump() if result.params else None,
+        )
+    else:
+        log_router_classification(
+            user_message=user_message,
+            classified_agent="chat",
+            confidence=0.5,
+            duration=duration,
+        )
+
+
+@traced("classify_intent", log_fn=_log_classify)
 async def classify_intent(user_message: str) -> RouterResult:
     """
     Classify user intent using Mistral Large via NVIDIA NIM.

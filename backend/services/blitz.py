@@ -4,6 +4,7 @@ Coordinates the find businesses → call → collect results workflow.
 """
 
 import asyncio
+import re
 import logging
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -26,6 +27,13 @@ from models import (
 )
 from services.places import search_businesses
 from services.twilio_caller import initiate_parallel_calls
+from services.weave_tracing import (
+    traced,
+    log_blitz_call,
+    log_blitz_session,
+    get_performance_summary,
+    get_trace_ctx,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +78,39 @@ async def save_session_state(session: BlitzSession) -> None:
     await save_session(session.id, session.to_dict())
 
 
+def _log_blitz_workflow(*, result, duration, error, args, kwargs, ctx):
+    """Log callback for run_blitz_workflow — handles session-level trace."""
+    session = result
+    service_type = ctx.get("service_type", "service")
+    location = ctx.get("location", "London")
+    session_id = ctx.get("session_id", "unknown")
+
+    if error or not session:
+        log_blitz_session(
+            session_id=session_id,
+            total_calls=0,
+            successful_calls=0,
+            total_duration=duration,
+            service_type=service_type,
+            location=location,
+        )
+        return
+
+    successful = [
+        c for c in session.calls if c.status == CallStatus.COMPLETE and c.result
+    ]
+    log_blitz_session(
+        session_id=session.id,
+        total_calls=len(session.calls),
+        successful_calls=len(successful),
+        total_duration=duration,
+        service_type=service_type,
+        location=location,
+        best_quote=successful[0].result if successful else None,
+    )
+
+
+@traced("run_blitz_workflow", log_fn=_log_blitz_workflow)
 async def run_blitz_workflow(
     user_message: str,
     params: RouterParams,
@@ -92,6 +133,25 @@ async def run_blitz_workflow(
     Returns:
         BlitzSession with results
     """
+    # Store context for log_fn callback
+    ctx = get_trace_ctx()
+    ctx["service_type"] = params.service or "service"
+    ctx["location"] = params.location or "London"
+
+    # Self-improving: check past performance before starting
+    try:
+        perf = get_performance_summary()
+        if perf.get("blitz_insights"):
+            insights = perf["blitz_insights"]
+            logger.info(
+                f"[Self-Improve] Past performance: "
+                f"{insights.get('total_calls', 0)} calls, "
+                f"{insights.get('response_rate', 0)*100:.0f}% response rate, "
+                f"{insights.get('quote_rate', 0)*100:.0f}% quote rate"
+            )
+    except Exception:
+        pass
+
     # Create session with provided ID or generate new one
     session = BlitzSession(
         user_message=user_message,
@@ -103,6 +163,7 @@ async def run_blitz_workflow(
     if session_id:
         session.id = session_id
 
+    ctx["session_id"] = session.id
     await save_session_state(session)
 
     try:
@@ -197,6 +258,27 @@ async def run_blitz_workflow(
         )
 
         await save_session_state(session)
+
+        # Log each call outcome (per-call logging stays here — multiple traces per session)
+        for call in session.calls:
+            call_duration = 0.0
+            if call.started_at and call.ended_at:
+                call_duration = (call.ended_at - call.started_at).total_seconds()
+
+            log_blitz_call(
+                business_name=call.business.name,
+                business_phone=call.business.phone,
+                call_success=call.status == CallStatus.COMPLETE and call.result is not None,
+                call_duration=call_duration,
+                ivr_navigated=False,
+                quote_received=_extract_quote(call.result) if call.result else None,
+                business_responded=call.status == CallStatus.COMPLETE,
+                result_text=call.result,
+                error=call.error,
+                session_id=session.id,
+            )
+
+        # Session-level log is handled by _log_blitz_workflow callback
         return session
 
     except Exception as e:
@@ -204,7 +286,25 @@ async def run_blitz_workflow(
         session.status = SessionStatus.ERROR
         await emit_event(session.id, "error", {"message": str(e)})
         await save_session_state(session)
+        # Session-level error log is handled by _log_blitz_workflow callback
         raise
+
+
+def _extract_quote(result_text: str) -> Optional[float]:
+    """Try to extract a numeric quote from result text.
+
+    Requires a currency symbol (£ or $) to avoid false positives
+    like matching plain numbers in "call 3 businesses".
+    """
+    if not result_text:
+        return None
+    match = re.search(r'[£$]\s*(\d+(?:\.\d{1,2})?)', result_text)
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            pass
+    return None
 
 
 async def _wait_for_calls_completion(

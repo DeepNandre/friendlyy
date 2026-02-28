@@ -17,6 +17,7 @@ from models import (
     RouterParams,
     Business,
 )
+from services.weave_tracing import traced, log_blitz_call, log_blitz_session, get_trace_ctx
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,39 @@ async def emit_demo_event(
     )
 
 
+def _log_demo_workflow(*, result, duration, error, args, kwargs, ctx):
+    """Log callback for run_demo_workflow — handles session-level trace."""
+    session = result
+    service_type = ctx.get("service_type", "service")
+    location = ctx.get("location", "London")
+    session_id = ctx.get("session_id", "unknown")
+
+    if error or not session:
+        log_blitz_session(
+            session_id=session_id,
+            total_calls=0,
+            successful_calls=0,
+            total_duration=duration,
+            service_type=service_type,
+            location=location,
+        )
+        return
+
+    successful = [
+        c for c in session.calls if c.status == CallStatus.COMPLETE and c.result
+    ]
+    log_blitz_session(
+        session_id=session.id,
+        total_calls=len(session.calls),
+        successful_calls=len(successful),
+        total_duration=duration,
+        service_type=service_type,
+        location=location,
+        best_quote=successful[0].result if successful else None,
+    )
+
+
+@traced("run_demo_workflow", log_fn=_log_demo_workflow)
 async def run_demo_workflow(
     user_message: str,
     params: RouterParams,
@@ -87,6 +121,11 @@ async def run_demo_workflow(
     """
     service = params.service or "plumber"
 
+    # Store context for log_fn callback
+    ctx = get_trace_ctx()
+    ctx["service_type"] = service
+    ctx["location"] = params.location or "London"
+
     # Create session with provided ID or generate new one
     session = BlitzSession(
         id=session_id if session_id else None,
@@ -98,6 +137,8 @@ async def run_demo_workflow(
     # If session_id was provided, use it
     if session_id:
         session.id = session_id
+
+    ctx["session_id"] = session.id
 
     # Save initial state
     await save_session(session.id, session.model_dump(mode="json"))
@@ -229,6 +270,24 @@ async def run_demo_workflow(
         # Save final state
         await save_session(session.id, session.model_dump(mode="json"))
 
+        # Log structured outcomes for each call (per-call logging stays here)
+        for call in session.calls:
+            call_duration = 0.0
+            if call.started_at and call.ended_at:
+                call_duration = (call.ended_at - call.started_at).total_seconds()
+            log_blitz_call(
+                business_name=call.business.name,
+                business_phone=call.business.phone,
+                call_success=call.status == CallStatus.COMPLETE and call.result is not None,
+                call_duration=call_duration,
+                ivr_navigated=False,
+                quote_received=None,
+                business_responded=call.status == CallStatus.COMPLETE,
+                result_text=call.result,
+                session_id=session.id,
+            )
+
+        # Session-level log is handled by _log_demo_workflow callback
         return session
 
     except Exception as e:
