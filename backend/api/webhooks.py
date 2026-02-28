@@ -8,7 +8,8 @@ from fastapi import APIRouter, Form, Query, Request
 
 from core.redis_client import get_session, save_session
 from models import CallStatus, SessionStatus
-from services.blitz import emit_event, get_session_state
+from core.events import emit_event
+from services.blitz import get_session_state
 
 logger = logging.getLogger(__name__)
 

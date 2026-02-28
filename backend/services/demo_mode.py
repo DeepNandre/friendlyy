@@ -8,7 +8,8 @@ import logging
 from datetime import datetime
 from typing import Dict, Any
 
-from core.redis_client import save_session, push_event
+from core.redis_client import save_session
+from core.events import emit_event as emit_demo_event
 from models import (
     BlitzSession,
     CallRecord,
@@ -51,20 +52,6 @@ DEMO_RESULTS = [
     "Can come today after 5pm, £85 call-out fee",
     None,  # No answer
 ]
-
-
-async def emit_demo_event(
-    session_id: str, event_type: str, data: Dict[str, Any]
-) -> None:
-    """Emit SSE event for demo session."""
-    await push_event(
-        session_id,
-        {
-            "event": event_type,
-            "data": data,
-            "timestamp": datetime.utcnow().isoformat(),
-        },
-    )
 
 
 async def run_demo_workflow(

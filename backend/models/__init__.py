@@ -9,6 +9,7 @@ from .blitz import (
     RouterParams,
     RouterResult,
 )
+from .queue import QueuePhase, QueueSession
 
 __all__ = [
     "AgentType",
@@ -22,4 +23,6 @@ __all__ = [
     "ChatResponse",
     "RouterParams",
     "RouterResult",
+    "QueuePhase",
+    "QueueSession",
 ]
