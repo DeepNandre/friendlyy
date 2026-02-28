@@ -8,7 +8,8 @@ import logging
 from datetime import datetime
 from typing import Dict, Any
 
-from core.redis_client import save_session, push_event
+from core.redis_client import save_session
+from core.sse import emit_event
 from models import (
     BlitzSession,
     CallRecord,
@@ -53,20 +54,6 @@ DEMO_RESULTS = [
 ]
 
 
-async def emit_demo_event(
-    session_id: str, event_type: str, data: Dict[str, Any]
-) -> None:
-    """Emit SSE event for demo session."""
-    await push_event(
-        session_id,
-        {
-            "event": event_type,
-            "data": data,
-            "timestamp": datetime.utcnow().isoformat(),
-        },
-    )
-
-
 async def run_demo_workflow(
     user_message: str,
     params: RouterParams,
@@ -104,7 +91,7 @@ async def run_demo_workflow(
 
     try:
         # Step 1: Simulate search
-        await emit_demo_event(
+        await emit_event(
             session.id,
             "status",
             {
@@ -125,7 +112,7 @@ async def run_demo_workflow(
 
         # Step 2: Start calls
         session.status = SessionStatus.CALLING
-        await emit_demo_event(
+        await emit_event(
             session.id,
             "status",
             {
@@ -143,7 +130,7 @@ async def run_demo_workflow(
             # Call starts ringing
             call.status = CallStatus.RINGING
             call.started_at = datetime.utcnow()
-            await emit_demo_event(
+            await emit_event(
                 session.id,
                 "call_started",
                 {
@@ -160,7 +147,7 @@ async def run_demo_workflow(
                 # Simulate no answer
                 call.status = CallStatus.NO_ANSWER
                 call.ended_at = datetime.utcnow()
-                await emit_demo_event(
+                await emit_event(
                     session.id,
                     "call_failed",
                     {
@@ -171,7 +158,7 @@ async def run_demo_workflow(
             else:
                 # Call connected
                 call.status = CallStatus.CONNECTED
-                await emit_demo_event(
+                await emit_event(
                     session.id,
                     "call_connected",
                     {
@@ -187,7 +174,7 @@ async def run_demo_workflow(
                 call.status = CallStatus.COMPLETE
                 call.result = result
                 call.ended_at = datetime.utcnow()
-                await emit_demo_event(
+                await emit_event(
                     session.id,
                     "call_result",
                     {
@@ -210,7 +197,7 @@ async def run_demo_workflow(
 
         # Final event
         await asyncio.sleep(0.5)
-        await emit_demo_event(
+        await emit_event(
             session.id,
             "session_complete",
             {
@@ -234,5 +221,5 @@ async def run_demo_workflow(
     except Exception as e:
         logger.error(f"Demo workflow error: {e}")
         session.status = SessionStatus.ERROR
-        await emit_demo_event(session.id, "error", {"message": str(e)})
+        await emit_event(session.id, "error", {"message": str(e)})
         raise

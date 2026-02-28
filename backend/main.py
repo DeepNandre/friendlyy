@@ -17,7 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from core import settings
 from core.http_client import http_client_lifespan, close_http_client
 from core.redis_client import close_redis_client
-from api import chat_router, blitz_router, stream_router, webhooks_router
+from api import chat_router, blitz_router, build_router, stream_router, webhooks_router
 
 # Configure logging
 logging.basicConfig(
@@ -89,6 +89,7 @@ app.include_router(chat_router, prefix="/api", tags=["chat"])
 app.include_router(blitz_router, prefix="/api/blitz", tags=["blitz"])
 app.include_router(stream_router, prefix="/api/blitz", tags=["stream"])
 app.include_router(webhooks_router, prefix="/api/blitz", tags=["webhooks"])
+app.include_router(build_router, prefix="/api/build", tags=["build"])
 
 
 @app.get("/")
@@ -116,6 +117,8 @@ async def api_root():
             "POST /api/chat": "Send a message to the agent",
             "GET /api/blitz/stream/{session_id}": "Stream real-time call updates",
             "GET /api/blitz/session/{session_id}": "Get session status",
+            "GET /api/build/stream/{session_id}": "Stream real-time build updates",
+            "GET /api/build/preview/{preview_id}": "View generated website preview",
         },
         "documentation": "/docs",
     }
