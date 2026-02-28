@@ -120,11 +120,13 @@ async def _run_background_workflow(session, demo_mode: bool):
             await run_demo_workflow(
                 user_message=session.user_message,
                 params=session.parsed_params,
+                session_id=session.id,
             )
         else:
             await run_blitz_workflow(
                 user_message=session.user_message,
                 params=session.parsed_params,
+                session_id=session.id,
             )
     except Exception as e:
         logger.error(f"Background workflow error: {e}")

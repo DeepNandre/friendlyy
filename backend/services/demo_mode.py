@@ -70,6 +70,7 @@ async def emit_demo_event(
 async def run_demo_workflow(
     user_message: str,
     params: RouterParams,
+    session_id: str = None,
 ) -> BlitzSession:
     """
     Simulate the full Blitz workflow for demo purposes.
@@ -79,18 +80,24 @@ async def run_demo_workflow(
     Args:
         user_message: Original user message
         params: Parsed router params
+        session_id: Existing session ID to use (optional)
 
     Returns:
         BlitzSession with simulated results
     """
     service = params.service or "plumber"
 
-    # Create session
+    # Create session with provided ID or generate new one
     session = BlitzSession(
+        id=session_id if session_id else None,
         user_message=user_message,
         parsed_params=params,
         status=SessionStatus.SEARCHING,
     )
+
+    # If session_id was provided, use it
+    if session_id:
+        session.id = session_id
 
     # Save initial state
     await save_session(session.id, session.model_dump(mode="json"))

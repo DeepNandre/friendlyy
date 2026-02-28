@@ -74,6 +74,7 @@ async def run_blitz_workflow(
     user_message: str,
     params: RouterParams,
     location: Optional[Dict[str, float]] = None,
+    session_id: str = None,
 ) -> BlitzSession:
     """
     Complete Blitz workflow:
@@ -86,16 +87,21 @@ async def run_blitz_workflow(
         user_message: Original user message
         params: Parsed router params
         location: Optional user location
+        session_id: Existing session ID to use (optional)
 
     Returns:
         BlitzSession with results
     """
-    # Create session
+    # Create session with provided ID or generate new one
     session = BlitzSession(
         user_message=user_message,
         parsed_params=params,
         status=SessionStatus.SEARCHING,
     )
+
+    # If session_id was provided, use it
+    if session_id:
+        session.id = session_id
 
     await save_session_state(session)
 
