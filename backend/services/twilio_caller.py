@@ -11,12 +11,27 @@ from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse
 
 from core import settings
+from core.redis_client import save_session
 from models import BlitzSession, CallRecord, CallScript, CallStatus
 
 logger = logging.getLogger(__name__)
 
 # Twilio client (lazy initialized)
 _twilio_client: Optional[Client] = None
+
+# Single source of truth for mapping Twilio status strings to internal CallStatus.
+# Used by webhook handlers. Add new Twilio statuses here.
+TWILIO_STATUS_MAP = {
+    "initiated": CallStatus.PENDING,
+    "ringing": CallStatus.RINGING,
+    "in-progress": CallStatus.CONNECTED,
+    "answered": CallStatus.CONNECTED,
+    "completed": CallStatus.COMPLETE,
+    "busy": CallStatus.BUSY,
+    "no-answer": CallStatus.NO_ANSWER,
+    "failed": CallStatus.FAILED,
+    "canceled": CallStatus.FAILED,
+}
 
 
 def get_twilio_client() -> Optional[Client]:
@@ -68,6 +83,11 @@ async def initiate_parallel_calls(
     # Execute all calls in parallel
     await asyncio.gather(*tasks, return_exceptions=True)
 
+    # Save once after all calls are created (or failed).
+    # All coroutines share the same session object, so call_sid values
+    # and failure statuses are already set in-memory by this point.
+    await save_session(session.id, session.model_dump(mode="json"))
+
 
 async def _make_single_call(
     session_id: str,
@@ -78,9 +98,13 @@ async def _make_single_call(
     """
     Make a single phone call to a business.
 
+    Updates call_record in-place. Does NOT save to Redis — the caller
+    (initiate_parallel_calls) saves once after all calls complete to
+    avoid race conditions between parallel coroutines.
+
     Args:
         session_id: Parent session ID
-        call_record: Call record to update
+        call_record: Call record to update (mutated in-place)
         script_text: Script for the AI to speak
         emit_callback: Async function to emit SSE events
     """
@@ -114,17 +138,20 @@ async def _make_single_call(
         )
 
         # Create the call via Twilio
-        # TwiML is served via webhook
         call = client.calls.create(
             to=call_record.business.phone,
             from_=settings.twilio_phone_number,
             url=f"{settings.backend_url}/api/blitz/twiml/{session_id}/{call_record.id}",
-            status_callback=f"{settings.backend_url}/api/blitz/webhook",
+            status_callback=f"{settings.backend_url}/api/blitz/webhook?session_id={session_id}&call_id={call_record.id}",
             status_callback_event=["initiated", "ringing", "answered", "completed"],
             status_callback_method="POST",
-            timeout=45,  # 45 second timeout per approved plan
+            timeout=45,
             record=True,
-            recording_status_callback=f"{settings.backend_url}/api/blitz/recording",
+            recording_status_callback=f"{settings.backend_url}/api/blitz/recording?session_id={session_id}&call_id={call_record.id}",
+            machine_detection="Enable",
+            async_amd=True,
+            async_amd_status_callback=f"{settings.backend_url}/api/blitz/amd?session_id={session_id}&call_id={call_record.id}",
+            async_amd_status_callback_method="POST",
         )
 
         call_record.call_sid = call.sid
@@ -193,59 +220,3 @@ def generate_twiml(
     return str(response)
 
 
-def handle_call_status_update(
-    call_sid: str,
-    status: str,
-    session: BlitzSession,
-) -> Optional[CallRecord]:
-    """
-    Handle Twilio status callback.
-
-    Args:
-        call_sid: Twilio Call SID
-        status: Call status from Twilio
-        session: Parent session
-
-    Returns:
-        Updated CallRecord or None if not found
-    """
-    # Find the call record
-    call_record = None
-    for call in session.calls:
-        if call.call_sid == call_sid:
-            call_record = call
-            break
-
-    if not call_record:
-        logger.warning(f"Call record not found for SID: {call_sid}")
-        return None
-
-    # Map Twilio status to our status
-    status_map = {
-        "initiated": CallStatus.PENDING,
-        "ringing": CallStatus.RINGING,
-        "in-progress": CallStatus.CONNECTED,
-        "answered": CallStatus.CONNECTED,
-        "completed": CallStatus.COMPLETE,
-        "busy": CallStatus.BUSY,
-        "no-answer": CallStatus.NO_ANSWER,
-        "failed": CallStatus.FAILED,
-        "canceled": CallStatus.FAILED,
-    }
-
-    new_status = status_map.get(status.lower(), CallStatus.FAILED)
-    call_record.status = new_status
-
-    # Set end time for terminal statuses
-    if new_status in [
-        CallStatus.COMPLETE,
-        CallStatus.BUSY,
-        CallStatus.NO_ANSWER,
-        CallStatus.FAILED,
-    ]:
-        call_record.ended_at = datetime.utcnow()
-        if call_record.started_at:
-            delta = call_record.ended_at - call_record.started_at
-            call_record.duration_seconds = int(delta.total_seconds())
-
-    return call_record

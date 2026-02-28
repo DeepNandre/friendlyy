@@ -254,7 +254,7 @@ async def _wait_for_calls_completion(
                     call.error = "Timeout"
             break
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(3)
 
 
 def _generate_summary(session: BlitzSession) -> str:
