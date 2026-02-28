@@ -80,21 +80,8 @@ app.add_middleware(
 )
 
 
-# Apply rate limiting to chat endpoint
-@app.middleware("http")
-async def rate_limit_middleware(request: Request, call_next):
-    """Apply rate limiting to specific endpoints."""
-    # Only rate limit the chat endpoint
-    if request.url.path == "/api/chat" and request.method == "POST":
-        # Check rate limit (10 per minute)
-        try:
-            await limiter.check_request(request)
-        except RateLimitExceeded:
-            return JSONResponse(
-                status_code=429,
-                content={"detail": "Rate limit exceeded. Please wait before sending more requests."},
-            )
-    return await call_next(request)
+# Rate limiting is applied via decorators on individual endpoints
+# See api/chat.py for @limiter.limit() usage
 
 
 # Include routers
