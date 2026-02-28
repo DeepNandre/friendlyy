@@ -19,8 +19,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<AIChat />} />
-          <Route path="/landing" element={<Index />} />
+          <Route path="/" element={<Index />} />
+          <Route path="/ai" element={<AIChat />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/vibecoder" element={<VibeCoder />} />
