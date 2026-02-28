@@ -1,12 +1,34 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import AnnouncementBar from "@/components/AnnouncementBar";
+import Navbar from "@/components/Navbar";
+import HeroSection from "@/components/HeroSection";
+import SkillsSection from "@/components/SkillsSection";
+import IntegrationsSection from "@/components/IntegrationsSection";
+import SolutionsSection from "@/components/SolutionsSection";
+import IntelligenceSection from "@/components/IntelligenceSection";
+import TestimonialSection from "@/components/TestimonialSection";
+import TalkToQuin from "@/components/TalkToQuin";
+import SecuritySection from "@/components/SecuritySection";
+import ReplacesSection from "@/components/ReplacesSection";
+import PricingSection from "@/components/PricingSection";
+import Footer from "@/components/Footer";
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <AnnouncementBar />
+      <Navbar />
+      <HeroSection />
+      <SkillsSection />
+      <IntegrationsSection />
+      <SolutionsSection />
+      <IntelligenceSection />
+      <TestimonialSection />
+      <TalkToQuin />
+      <SecuritySection />
+      <ReplacesSection />
+      <PricingSection />
+      <Footer />
     </div>
   );
 };
