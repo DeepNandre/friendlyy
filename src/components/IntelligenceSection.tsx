@@ -1,13 +1,13 @@
 const blogPosts = [
-  "Bad prep is usually why calls go sideways",
-  "Building workflows for your specific routine",
-  "Introducing the new Quin",
-  "Why transcription isn't the same as assistance",
-  "How to set up a high-converting scheduling flow",
-  "The 7 automations every advisor should turn on in Quin",
-  "Stop paying the 'Tool Tax': Quin replaces 5 subscriptions",
-  "Less work. More consistency. Templates are here.",
-  "Record meetings anywhere with Quin's upgraded in-person notetaker",
+  "How AI voice agents are changing customer service",
+  "Why parallel calling gets you better quotes",
+  "The psychology of phone anxiety (and how to beat it)",
+  "How Friendly navigates phone menus automatically",
+  "5 calls you should never make yourself again",
+  "The hidden cost of waiting on hold",
+  "How we built voice agents that businesses trust",
+  "Introducing Blitz: parallel calling for instant quotes",
+  "Built at Mistral Hackathon 2026",
 ];
 
 const IntelligenceSection = () => {
@@ -19,10 +19,10 @@ const IntelligenceSection = () => {
           {/* Left */}
           <div className="lg:w-1/2">
             <h2 className="font-serif text-4xl md:text-5xl font-normal text-foreground mb-6 leading-tight">
-              More than just a meeting assistant
+              More than just a chatbot
             </h2>
             <p className="font-sans text-base text-muted-foreground mb-8 max-w-md">
-              Quin doesn't just complete tasks - it knows how you want to get them done. Set your preferences once and Quin makes decisions the way you would, handling work like someone who's worked with you for years.
+              Friendly doesn't just answer questions — it takes action. Real phone calls. Real bookings. Real results. Powered by Mistral AI and built to handle the stuff you've been putting off.
             </p>
             <img
               src="https://cdn.prod.website-files.com/66563d83090173fa830e5776/688a46361a5888a9d71f7ce3_businesswoman.avif"

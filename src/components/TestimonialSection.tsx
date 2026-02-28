@@ -3,7 +3,7 @@ const TestimonialSection = () => {
     <section className="py-24 bg-foreground text-background">
       <div className="max-w-5xl mx-auto px-6 text-center">
         <blockquote className="font-serif text-3xl md:text-4xl lg:text-5xl font-normal leading-tight mb-8">
-          "Quin eliminated the admin work that used to hang over my head. Now I focus on clients, not tasks."
+          "Friendly called 5 plumbers for me in 30 seconds and got me the best quote. I never want to make a phone call again."
         </blockquote>
         <p className="font-sans text-sm text-background/60 mb-16">
           — Dan Westfall CFP®, CFS®, Founder, Client Focused Financial
@@ -11,12 +11,12 @@ const TestimonialSection = () => {
 
         <div className="flex flex-col sm:flex-row justify-center gap-20 mb-16">
           <div className="text-center">
-            <div className="font-serif text-6xl font-normal text-background mb-2">40+</div>
-            <div className="font-sans text-sm text-background/60">Hours of admin work offloaded each month</div>
+            <div className="font-serif text-6xl font-normal text-background mb-2">30s</div>
+            <div className="font-sans text-sm text-background/60">Average time to get multiple quotes</div>
           </div>
           <div className="text-center">
-            <div className="font-serif text-6xl font-normal text-background mb-2">5x</div>
-            <div className="font-sans text-sm text-background/60">Faster follow-up after client meetings</div>
+            <div className="font-serif text-6xl font-normal text-background mb-2">5+</div>
+            <div className="font-sans text-sm text-background/60">Calls made in parallel for you</div>
           </div>
         </div>
 
@@ -34,7 +34,7 @@ const TestimonialSection = () => {
             href="#"
             className="px-6 py-3 rounded-full bg-[hsl(var(--accent))] text-foreground text-sm font-semibold font-sans hover:opacity-80 transition-opacity"
           >
-            Try Quin Free
+            Try Friendly Free
           </a>
         </div>
       </div>

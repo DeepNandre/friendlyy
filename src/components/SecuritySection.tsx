@@ -28,7 +28,7 @@ const SecuritySection = () => {
               Your information stays where it belongs
             </h2>
             <p className="font-sans text-base text-muted-foreground mb-10">
-              Quin works with your data but never stores it, using enterprise-grade protection for each secure interaction.
+              Friendly works with your data but never stores it, using enterprise-grade protection for each secure interaction.
             </p>
 
             <div className="space-y-6">

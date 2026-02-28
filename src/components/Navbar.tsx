@@ -16,7 +16,7 @@ const Navbar = () => {
               <path d="M2 12h20"/>
             </svg>
           </div>
-          <span className="font-serif text-xl font-normal text-foreground">Quin</span>
+          <span className="font-serif text-xl font-normal text-foreground">Friendly</span>
         </a>
 
         {/* Desktop Nav */}
@@ -35,7 +35,7 @@ const Navbar = () => {
         {/* CTA */}
         <div className="hidden md:flex items-center gap-3">
           <a
-            href="#"
+            href="/dashboard"
             className="px-5 py-2 rounded-full border-2 border-foreground bg-transparent text-sm font-semibold font-sans hover:bg-foreground hover:text-background transition-colors"
           >
             GET STARTED
@@ -58,7 +58,7 @@ const Navbar = () => {
           <a href="#" className="text-sm font-sans">Solutions</a>
           <a href="#" className="text-sm font-sans">Pricing</a>
           <a href="#" className="text-sm font-sans">Login</a>
-          <a href="#" className="px-5 py-2 rounded-full border-2 border-foreground text-sm font-semibold font-sans text-center">GET STARTED</a>
+          <a href="/dashboard" className="px-5 py-2 rounded-full border-2 border-foreground text-sm font-semibold font-sans text-center">GET STARTED</a>
         </div>
       )}
     </nav>

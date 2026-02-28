@@ -23,13 +23,13 @@ const channels = [
   },
 ];
 
-const TalkToQuin = () => {
+const TalkToFriendly = () => {
   const [active, setActive] = useState(0);
 
   return (
     <section className="py-20 bg-background">
       <div className="max-w-5xl mx-auto px-6 text-center">
-        <p className="font-sans text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">Talk to Quin</p>
+        <p className="font-sans text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">Talk to Friendly</p>
         <h2 className="font-serif text-4xl md:text-5xl font-normal text-foreground mb-4 leading-tight">
           Available anytime, anywhere
         </h2>
@@ -65,4 +65,4 @@ const TalkToQuin = () => {
   );
 };
 
-export default TalkToQuin;
+export default TalkToFriendly;

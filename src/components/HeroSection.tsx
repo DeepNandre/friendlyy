@@ -17,10 +17,10 @@ const HeroSection = () => {
     <section className="bg-background pt-16 pb-0">
       <div className="max-w-5xl mx-auto px-6 text-center">
         <h1 className="font-serif text-6xl md:text-7xl lg:text-8xl font-normal text-foreground leading-tight mb-6">
-          Meet your<br />dream assistant
+          You say it.<br />It's sorted.
         </h1>
         <p className="font-sans text-lg text-muted-foreground max-w-xl mx-auto mb-10">
-          Quin handles everything a great assistant would—follow-ups, scheduling, data entry, and task coordination—across your entire day, not just meetings.
+          Friendly handles the annoying stuff for you — phone calls, quotes, bookings, cancellations. Just type what you need like texting a friend.
         </p>
 
         {/* Tabs */}
@@ -54,13 +54,13 @@ const HeroSection = () => {
       {/* CTAs */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4 py-10">
         <button className="px-6 py-3 rounded-full border-2 border-foreground bg-transparent text-sm font-semibold font-sans hover:bg-foreground hover:text-background transition-colors">
-          Get Demo
+          Watch Demo
         </button>
         <a
-          href="#"
+          href="/chat"
           className="px-6 py-3 rounded-full bg-foreground text-background text-sm font-semibold font-sans hover:opacity-80 transition-opacity"
         >
-          Try Quin Free
+          Try Friendly Free
         </a>
       </div>
     </section>

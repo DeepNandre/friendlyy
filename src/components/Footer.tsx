@@ -12,7 +12,7 @@ const Footer = () => {
                   <path d="M2 12h20"/>
                 </svg>
               </div>
-              <span className="font-serif text-lg text-background">Quin</span>
+              <span className="font-serif text-lg text-background">Friendly</span>
             </div>
             <p className="font-sans text-xs text-background/50 max-w-xs">
               Meet your dream assistant. Handles everything a great assistant would.
@@ -48,7 +48,7 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-background/10 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="font-sans text-xs text-background/40">© 2024 Quin. All rights reserved.</p>
+          <p className="font-sans text-xs text-background/40">© 2025 Friendly. All rights reserved.</p>
           <div className="flex gap-6">
             <a href="#" className="font-sans text-xs text-background/40 hover:text-background transition-colors">Privacy Policy</a>
             <a href="#" className="font-sans text-xs text-background/40 hover:text-background transition-colors">Terms of Service</a>

@@ -60,6 +60,31 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Agent Dashboard Routes
+
+- `/dashboard` - Friendly agent launcher (Blitz + VibeCoder)
+- `/chat` - Blitz execution chat (real-time call updates)
+- `/vibecoder` - Embedded VibeCoder interface (iframe wrapper with new-tab fallback)
+
+## Environment Variables (Frontend)
+
+Use these in your local environment for backend alignment:
+
+```sh
+# Blitz backend base URL (FastAPI)
+VITE_BLITZ_API_BASE=http://localhost:8000
+
+# Optional, backwards-compatible fallback used by some existing hooks
+VITE_API_URL=http://localhost:8000
+
+# Optional: customize SSE path shape.
+# Default is /api/blitz/stream/:sessionId behavior via suffix append.
+VITE_BLITZ_STREAM_PATH=/api/blitz/stream
+
+# VibeCoder frontend URL used by /vibecoder wrapper
+VITE_VIBECODER_URL=http://localhost:3000
+```
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.

@@ -1,19 +1,13 @@
 const skills = [
-  "Allow Quin to join your meetings",
-  "Identify and create opportunities from notes + transcripts",
-  "Draft follow-up emails",
-  "Learn your voice and tone from sent emails",
-  "Update any field in existing contact records",
-  "Upload PDFs to contact records",
-  "Add notes to contacts and households",
-  "Create and assign tasks from meeting notes",
-  "Create new contact records in CRM",
-  "Set task and calendar reminders",
-  "Create new deal from product lines",
-  "Create context-aware outputs from templates",
-  "Add context and background information to calendar events",
-  "Update meeting events with follow-up details",
-  "Generate documents",
+  "Call multiple businesses and get quotes in parallel",
+  "Navigate phone menus and wait on hold for you",
+  "Cancel subscriptions by calling customer service",
+  "Book appointments at doctors, dentists, restaurants",
+  "Negotiate bills and get better rates",
+  "Find available services in your area",
+  "Compare prices across multiple providers",
+  "Schedule callbacks when lines are busy",
+  "Follow up on pending requests automatically",
 ];
 
 const SkillsSection = () => {
@@ -28,7 +22,7 @@ const SkillsSection = () => {
               Say goodbye to<br />busy work, forever
             </h2>
             <p className="font-sans text-base text-muted-foreground mb-8 max-w-sm">
-              Quin learns your preferences and handles tasks the way you would, keeping everything organized without the extra effort.
+              Friendly learns your preferences and handles calls the way you would, keeping everything organized without the phone anxiety.
             </p>
 
             {/* Skills list */}
@@ -45,7 +39,7 @@ const SkillsSection = () => {
               ))}
             </div>
 
-            <div className="text-sm font-sans font-semibold text-muted-foreground mb-4">70+ intelligent skills to eliminate your admin work</div>
+            <div className="text-sm font-sans font-semibold text-muted-foreground mb-4">AI agents that make real phone calls for you</div>
             <a href="#" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border-2 border-foreground text-sm font-semibold font-sans hover:bg-foreground hover:text-background transition-colors">
               Explore Skills →
             </a>

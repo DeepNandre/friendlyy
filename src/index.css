@@ -37,10 +37,10 @@
     --radius: 0.5rem;
 
     /* Custom tokens */
-    --quin-yellow: 48 95% 55%;
-    --quin-cream: 54 100% 97%;
-    --quin-dark: 30 10% 10%;
-    --quin-gray: 40 5% 55%;
+    --friendly-yellow: 48 95% 55%;
+    --friendly-cream: 54 100% 97%;
+    --friendly-dark: 30 10% 10%;
+    --friendly-gray: 40 5% 55%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;

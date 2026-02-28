@@ -10,10 +10,10 @@ const PricingSection = () => {
       <div className="max-w-4xl mx-auto px-6">
         <p className="font-sans text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4 text-center">Pricing</p>
         <h2 className="font-serif text-4xl md:text-5xl font-normal text-foreground mb-4 leading-tight text-center">
-          Get Quin free for 2 weeks
+          Get Friendly free for 2 weeks
         </h2>
         <p className="font-sans text-base text-muted-foreground mb-12 max-w-xl mx-auto text-center">
-          Get started free for 14 days. Whether it's just you or your whole team, Quin gives you the same smart features to handle notes, follow-ups, and updates—automatically.
+          Get started free for 14 days. Whether it's just you or your whole team, Friendly handles phone calls, bookings, and tedious tasks—automatically.
         </p>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -47,7 +47,7 @@ const PricingSection = () => {
             </div>
 
             <div className="space-y-3 mb-8">
-              <h4 className="font-sans font-semibold text-sm text-foreground">What Quin takes off your plate</h4>
+              <h4 className="font-sans font-semibold text-sm text-foreground">What Friendly takes off your plate</h4>
               {[
                 `Summarizes ~${hours} meetings`,
                 `Drafts ~${hours * 10} emails/follow-ups`,
@@ -96,7 +96,7 @@ const PricingSection = () => {
             </div>
 
             <a
-              href="mailto:gabe@heyquin.io?subject=Enterprise pricing"
+              href="mailto:hello@friendly.ai?subject=Enterprise pricing"
               className="block w-full py-3 rounded-full bg-[hsl(var(--accent))] text-foreground text-sm font-semibold font-sans text-center hover:opacity-80 transition-opacity"
             >
               Contact us
