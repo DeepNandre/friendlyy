@@ -1,5 +1,5 @@
 """
-Intent classification using NVIDIA NIM (Mistral Large).
+Intent classification using NVIDIA NIM (Mixtral 8x7B).
 Routes user messages to appropriate agents.
 """
 
@@ -12,7 +12,7 @@ from models import AgentType, RouterParams, RouterResult
 
 logger = logging.getLogger(__name__)
 
-# NVIDIA NIM endpoint for Mistral Large
+# NVIDIA NIM endpoint for Mixtral 8x7B
 NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 
 ROUTER_SYSTEM_PROMPT = """You are a router for Friendly, an AI assistant that makes phone calls on behalf of users.
@@ -92,7 +92,7 @@ async def classify_intent(user_message: str) -> RouterResult:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "mistralai/mistral-large-2-instruct",
+                "model": "mistralai/mixtral-8x7b-instruct-v0.1",
                 "messages": [
                     {"role": "system", "content": ROUTER_SYSTEM_PROMPT},
                     {"role": "user", "content": user_message},
