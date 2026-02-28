@@ -10,6 +10,7 @@ from models import ChatRequest, ChatResponse, AgentType
 from services.router import classify_intent
 from services.blitz import run_blitz_workflow
 from services.demo_mode import run_demo_workflow
+from services.chat import generate_chat_response
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ async def chat(
     elif result.agent == AgentType.BID:
         return _handle_not_implemented("bid", result)
     else:
-        return _handle_chat(request, result)
+        return await _handle_chat(request, result)
 
 
 async def _handle_blitz(
@@ -140,27 +141,12 @@ def _handle_not_implemented(agent_name: str, result) -> ChatResponse:
     )
 
 
-def _handle_chat(request: ChatRequest, result) -> ChatResponse:
-    """Handle general chat requests."""
+async def _handle_chat(request: ChatRequest, result) -> ChatResponse:
+    """Handle general chat requests using Mistral."""
     import uuid
 
-    # Generate a simple response
-    message = request.message.lower()
-
-    if any(word in message for word in ["hello", "hi", "hey"]):
-        response = "Hey! I'm Friendly. I can help you find services and get quotes by making phone calls on your behalf. Try saying 'find me a plumber' or 'get quotes for an electrician'."
-    elif any(word in message for word in ["help", "what can you do", "how"]):
-        response = """I'm Friendly, your AI assistant that makes real phone calls!
-
-I can help you with:
-- **Blitz**: Find services and get quotes (plumbers, electricians, etc.)
-- **Bounce**: Cancel subscriptions (coming soon)
-- **Queue**: Wait on hold for you (coming soon)
-- **Bid**: Negotiate your bills (coming soon)
-
-Try: "Find me a plumber who can come tomorrow" """
-    else:
-        response = "I'm not sure what you need. Try asking me to find a service, like 'find me a plumber in London'."
+    # Generate response using Mistral
+    response = await generate_chat_response(request.message)
 
     return ChatResponse(
         session_id=str(uuid.uuid4()),

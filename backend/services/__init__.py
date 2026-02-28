@@ -4,6 +4,7 @@ from .places import search_businesses
 from .twilio_caller import initiate_parallel_calls, generate_twiml
 from .elevenlabs_voice import generate_tts_audio
 from .demo_mode import run_demo_workflow
+from .chat import generate_chat_response
 
 __all__ = [
     "classify_intent",
@@ -15,4 +16,5 @@ __all__ = [
     "generate_twiml",
     "generate_tts_audio",
     "run_demo_workflow",
+    "generate_chat_response",
 ]
