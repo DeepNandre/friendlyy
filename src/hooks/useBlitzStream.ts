@@ -19,6 +19,8 @@ export type CallStatusType =
 export interface CallStatus {
   business: string;
   phone?: string;
+  address?: string;
+  rating?: number;
   status: CallStatusType;
   result?: string;
   error?: string;
@@ -28,7 +30,7 @@ export interface BlitzStreamState {
   isConnected: boolean;
   sessionStatus: "idle" | "searching" | "calling" | "complete" | "error";
   callStatuses: CallStatus[];
-  businesses: Array<{ name: string; phone: string; address?: string }>;
+  businesses: Array<{ name: string; phone: string; address?: string; rating?: number }>;
   summary: string | null;
   error: string | null;
 }
@@ -47,6 +49,23 @@ const buildStreamUrl = (sessionId: string): string => {
     : BLITZ_STREAM_PATH;
   return `${BLITZ_API_BASE}${normalizedPath}/${sessionId}`;
 };
+
+/** Match a call status entry by phone (primary) or business name (fallback). */
+function matchesCall(call: CallStatus, data: { business?: string; phone?: string }): boolean {
+  if (call.phone && data.phone && call.phone === data.phone) return true;
+  return call.business === data.business;
+}
+
+/** Map business data from SSE events into CallStatus entries with metadata. */
+function mapBusinessesToCallStatuses(businesses: any[]): CallStatus[] {
+  return businesses.map((b) => ({
+    business: b.name,
+    phone: b.phone,
+    address: b.address,
+    rating: b.rating,
+    status: "pending" as CallStatusType,
+  }));
+}
 
 export function useBlitzStream(sessionId: string | null) {
   const [state, setState] = useState<BlitzStreamState>({
@@ -79,32 +98,26 @@ export function useBlitzStream(sessionId: string | null) {
     // Handle session_start
     eventSource.addEventListener("session_start", (e) => {
       const data = JSON.parse(e.data);
+      const businesses = data.businesses || [];
       setState((prev) => ({
         ...prev,
         sessionStatus: data.status,
-        businesses: data.businesses || [],
-        callStatuses:
-          data.businesses?.map((b: any) => ({
-            business: b.name,
-            phone: b.phone,
-            status: "pending" as CallStatusType,
-          })) || [],
+        businesses,
+        callStatuses: mapBusinessesToCallStatuses(businesses),
       }));
     });
 
     // Handle status updates
     eventSource.addEventListener("status", (e) => {
       const data = JSON.parse(e.data);
+      const businesses = data.businesses;
       setState((prev) => ({
         ...prev,
         sessionStatus: data.status,
-        businesses: data.businesses || prev.businesses,
-        callStatuses:
-          data.businesses?.map((b: any) => ({
-            business: b.name,
-            phone: b.phone,
-            status: "pending" as CallStatusType,
-          })) || prev.callStatuses,
+        businesses: businesses || prev.businesses,
+        callStatuses: businesses
+          ? mapBusinessesToCallStatuses(businesses)
+          : prev.callStatuses,
       }));
     });
 
@@ -114,7 +127,7 @@ export function useBlitzStream(sessionId: string | null) {
       setState((prev) => ({
         ...prev,
         callStatuses: prev.callStatuses.map((c) =>
-          c.business === data.business
+          matchesCall(c, data)
             ? { ...c, status: "ringing" as CallStatusType }
             : c
         ),
@@ -127,7 +140,7 @@ export function useBlitzStream(sessionId: string | null) {
       setState((prev) => ({
         ...prev,
         callStatuses: prev.callStatuses.map((c) =>
-          c.business === data.business
+          matchesCall(c, data)
             ? { ...c, status: "connected" as CallStatusType }
             : c
         ),
@@ -140,7 +153,7 @@ export function useBlitzStream(sessionId: string | null) {
       setState((prev) => ({
         ...prev,
         callStatuses: prev.callStatuses.map((c) =>
-          c.business === data.business
+          matchesCall(c, data)
             ? {
                 ...c,
                 status: "complete" as CallStatusType,
@@ -157,7 +170,7 @@ export function useBlitzStream(sessionId: string | null) {
       setState((prev) => ({
         ...prev,
         callStatuses: prev.callStatuses.map((c) =>
-          c.business === data.business
+          matchesCall(c, data)
             ? {
                 ...c,
                 status: "failed" as CallStatusType,
@@ -168,20 +181,35 @@ export function useBlitzStream(sessionId: string | null) {
       }));
     });
 
-    // Handle session_complete
+    // Handle session_complete — preserve metadata from existing statuses
     eventSource.addEventListener("session_complete", (e) => {
       const data = JSON.parse(e.data);
-      setState((prev) => ({
-        ...prev,
-        sessionStatus: "complete",
-        summary: data.summary,
-        callStatuses:
-          data.results?.map((r: any) => ({
-            business: r.business,
-            status: r.status as CallStatusType,
-            result: r.result,
-          })) || prev.callStatuses,
-      }));
+      setState((prev) => {
+        const updatedStatuses = data.results
+          ? data.results.map((r: any) => {
+              // Try to find existing status to preserve address/rating/phone
+              const existing = prev.callStatuses.find((c) =>
+                matchesCall(c, { business: r.business, phone: r.phone })
+              );
+              return {
+                business: r.business,
+                phone: existing?.phone || r.phone,
+                address: existing?.address,
+                rating: existing?.rating,
+                status: r.status as CallStatusType,
+                result: r.result,
+                error: r.error,
+              };
+            })
+          : prev.callStatuses;
+
+        return {
+          ...prev,
+          sessionStatus: "complete",
+          summary: data.summary,
+          callStatuses: updatedStatuses,
+        };
+      });
       eventSource.close();
     });
 

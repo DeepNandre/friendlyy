@@ -108,6 +108,22 @@
   animation: slide-up 0.5s ease-out forwards;
 }
 
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out both;
+}
+
+@keyframes green-flash {
+  0% { background-color: hsl(142 76% 95%); }
+  100% { background-color: transparent; }
+}
+.animate-green-flash {
+  animation: green-flash 1s ease-out;
+}
+
 .tab-active {
   background: hsl(var(--accent));
   color: hsl(var(--accent-foreground));
