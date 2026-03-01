@@ -101,7 +101,16 @@ async def _handle_blitz(
     )
 
     from core.redis_client import save_session
-    await save_session(session.id, session.model_dump(mode="json"))
+    try:
+        await save_session(session.id, session.model_dump(mode="json"))
+    except Exception as e:
+        logger.error(f"Failed to save session: {e}")
+        return ChatResponse(
+            session_id=session.id,
+            agent=AgentType.BLITZ,
+            status="error",
+            message="Sorry, I couldn't start the search. Please try again.",
+        )
 
     # Start background task
     background_tasks.add_task(_run_background_workflow, session, settings.demo_mode)
@@ -118,6 +127,9 @@ async def _handle_blitz(
 
 async def _run_background_workflow(session, demo_mode: bool):
     """Run the Blitz workflow in background."""
+    from core.redis_client import push_event
+    from datetime import datetime
+
     try:
         if demo_mode:
             await run_demo_workflow(
@@ -133,6 +145,15 @@ async def _run_background_workflow(session, demo_mode: bool):
             )
     except Exception as e:
         logger.error(f"Background workflow error: {e}")
+        # Emit error event so frontend doesn't hang
+        await push_event(
+            session.id,
+            {
+                "event": "error",
+                "data": {"message": str(e)},
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
 
 
 async def _handle_build(

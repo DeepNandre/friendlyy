@@ -22,12 +22,14 @@ Classify the user's intent and output ONLY valid JSON:
 {"agent": "blitz|build|bounce|queue|bid|chat", "params": {...}, "confidence": 0.0-1.0}
 
 Agents:
-- blitz: Find services, get quotes, check availability (plumber, electrician, restaurant, etc.)
+- blitz: Find services, get quotes, check availability. ANY request to find, locate, search for, or get quotes from a service provider is blitz. This includes plumbers, electricians, cleaners, locksmiths, restaurants, dentists, mechanics, movers, tutors, painters, gardeners, and ANY other service.
 - build: Build, create, or make websites, landing pages, portfolios, apps, web pages
 - bounce: Cancel subscriptions (Netflix, gym, etc.)
 - queue: Wait on hold for someone (HMRC, bank, etc.)
 - bid: Negotiate bills lower (Sky, broadband, etc.)
-- chat: General conversation, greetings, help, questions about the service
+- chat: ONLY for greetings, help questions, or messages that don't involve finding/calling any service
+
+IMPORTANT: If the user mentions ANY service they want to find, get quotes from, or check availability for, classify as blitz. When in doubt between blitz and chat, choose blitz.
 
 Params for blitz:
 - service: the type of service needed (plumber, electrician, locksmith, etc.)
@@ -47,6 +49,24 @@ User: "find me a plumber who can come tomorrow"
 User: "I need an electrician in Manchester urgently"
 {"agent": "blitz", "params": {"service": "electrician", "location": "Manchester", "timeframe": "urgent"}, "confidence": 0.95}
 
+User: "find cleaners near me"
+{"agent": "blitz", "params": {"service": "cleaners", "action": "find"}, "confidence": 0.95}
+
+User: "was planning to find cleaners near me"
+{"agent": "blitz", "params": {"service": "cleaners", "action": "find"}, "confidence": 0.90}
+
+User: "get quotes for bathroom cleaning in Wembley"
+{"agent": "blitz", "params": {"service": "bathroom cleaning", "location": "Wembley", "action": "quote"}, "confidence": 0.95}
+
+User: "looking for a locksmith in London"
+{"agent": "blitz", "params": {"service": "locksmith", "location": "London", "action": "find"}, "confidence": 0.95}
+
+User: "can you find me a good dentist?"
+{"agent": "blitz", "params": {"service": "dentist", "action": "find"}, "confidence": 0.90}
+
+User: "I want to get my car fixed"
+{"agent": "blitz", "params": {"service": "mechanic", "action": "find"}, "confidence": 0.85}
+
 User: "make me a landing page for my dog walking business"
 {"agent": "build", "params": {"service": "landing page", "notes": "dog walking business"}, "confidence": 0.95}
 
@@ -55,9 +75,6 @@ User: "build me a portfolio website, I'm a photographer"
 
 User: "create a coming soon page for my app called Friendly"
 {"agent": "build", "params": {"service": "coming soon page", "notes": "app called Friendly"}, "confidence": 0.95}
-
-User: "make a restaurant menu page for an Italian place"
-{"agent": "build", "params": {"service": "restaurant menu", "notes": "Italian restaurant"}, "confidence": 0.95}
 
 User: "cancel my Netflix subscription"
 {"agent": "bounce", "params": {"service": "Netflix", "action": "cancel"}, "confidence": 0.98}
