@@ -21,6 +21,7 @@ import {
 import { useBlitzStream, CallStatusType, TranscriptEntry } from '../hooks/useBlitzStream';
 import { useBuildStream } from '../hooks/useBuildStream';
 import { useInboxStream, InboxSummary } from '../hooks/useInboxStream';
+import { useCallFriendStream, CallFriendTranscript } from '../hooks/useCallFriendStream';
 import { InboxPreviewCard } from '../components/chat/InboxPreviewCard';
 import { Markdown } from '../components/ui/markdown';
 import { SourceList } from '../components/ui/source';
@@ -50,7 +51,7 @@ import { cn } from '@/lib/utils';
 const BlitzMapCard = lazy(() => import('@/components/map/BlitzMapCard').then(m => ({ default: m.BlitzMapCard })));
 
 type MessageRole = 'user' | 'assistant';
-type AgentType = 'blitz' | 'build' | 'chat' | 'inbox' | null;
+type AgentType = 'blitz' | 'build' | 'chat' | 'inbox' | 'call_friend' | null;
 
 interface CallStatus {
   business: string;
@@ -92,6 +93,10 @@ interface Message {
   inboxSummary?: InboxSummary;
   inboxAuthUrl?: string | null;
   inboxStatus?: string;
+  // Call Friend fields
+  callFriendPhase?: string;
+  callFriendTranscripts?: CallFriendTranscript[];
+  callFriendName?: string;
 }
 
 const BLITZ_API_BASE =
@@ -115,6 +120,8 @@ export default function AIChat() {
   const [activeBuildMessageId, setActiveBuildMessageId] = useState<string | null>(null);
   const [activeInboxSessionId, setActiveInboxSessionId] = useState<string | null>(null);
   const [activeInboxMessageId, setActiveInboxMessageId] = useState<string | null>(null);
+  const [activeCallFriendSessionId, setActiveCallFriendSessionId] = useState<string | null>(null);
+  const [activeCallFriendMessageId, setActiveCallFriendMessageId] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState('mixtral-8x7b');
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -128,6 +135,7 @@ export default function AIChat() {
   const stream = useBlitzStream(activeSessionId);
   const buildStream = useBuildStream(activeBuildSessionId);
   const inboxStream = useInboxStream(activeInboxSessionId);
+  const callFriendStream = useCallFriendStream(activeCallFriendSessionId);
 
   // When selecting a session from history, load its messages
   const handleSelectSession = (sessionId: string) => {
@@ -300,6 +308,37 @@ export default function AIChat() {
     }
   }, [inboxStream, activeInboxMessageId, activeInboxSessionId]);
 
+  // Handle call friend stream updates
+  useEffect(() => {
+    if (!activeCallFriendMessageId || !activeCallFriendSessionId) return;
+
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== activeCallFriendMessageId) return msg;
+        let content = msg.content;
+        if (callFriendStream.phase === 'initiating') content = `Calling ${callFriendStream.friendName || 'your friend'}...`;
+        else if (callFriendStream.phase === 'ringing') content = callFriendStream.message || `Ringing ${callFriendStream.friendName}...`;
+        else if (callFriendStream.phase === 'connected') content = callFriendStream.message || `Connected to ${callFriendStream.friendName}!`;
+        else if (callFriendStream.phase === 'complete' && callFriendStream.summary) content = callFriendStream.summary;
+        else if (callFriendStream.phase === 'failed' || callFriendStream.phase === 'no_answer') content = callFriendStream.error || `Couldn't reach ${callFriendStream.friendName}`;
+        return {
+          ...msg,
+          content,
+          isThinking: false,
+          callFriendPhase: callFriendStream.phase,
+          callFriendTranscripts: callFriendStream.transcripts.length > 0 ? callFriendStream.transcripts : msg.callFriendTranscripts,
+          callFriendName: callFriendStream.friendName || msg.callFriendName,
+        };
+      })
+    );
+
+    if (callFriendStream.isComplete) {
+      setIsLoading(false);
+      setActiveCallFriendSessionId(null);
+      setActiveCallFriendMessageId(null);
+    }
+  }, [callFriendStream, activeCallFriendMessageId, activeCallFriendSessionId]);
+
   const mapCallStatus = (status: CallStatusType): CallStatus['status'] => {
     switch (status) {
       case 'pending': return 'pending';
@@ -393,6 +432,9 @@ export default function AIChat() {
       } else if (data.agent === 'inbox' && data.session_id) {
         setActiveInboxSessionId(data.session_id);
         setActiveInboxMessageId(thinkingMessageId);
+      } else if (data.agent === 'call_friend' && data.session_id && data.stream_url) {
+        setActiveCallFriendSessionId(data.session_id);
+        setActiveCallFriendMessageId(thinkingMessageId);
       } else {
         setIsLoading(false);
       }
@@ -790,6 +832,64 @@ export default function AIChat() {
                             authUrl={message.inboxAuthUrl}
                             error={message.inboxStatus === 'error' ? message.content : undefined}
                           />
+                        )}
+
+                        {/* Call Friend Widget */}
+                        {message.agent === 'call_friend' && message.callFriendPhase && (
+                          <div className="w-full max-w-md mx-auto rounded-xl shadow-sm border border-border bg-card overflow-hidden mt-3">
+                            {/* Header */}
+                            <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
+                                <Phone size={18} className="text-white" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-medium text-foreground">
+                                  Calling {message.callFriendName || 'your friend'}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {message.callFriendPhase === 'initiating' && 'Starting call...'}
+                                  {message.callFriendPhase === 'ringing' && 'Ringing...'}
+                                  {message.callFriendPhase === 'connected' && 'Connected'}
+                                  {message.callFriendPhase === 'complete' && 'Call ended'}
+                                  {message.callFriendPhase === 'failed' && 'Call failed'}
+                                  {message.callFriendPhase === 'no_answer' && 'No answer'}
+                                </div>
+                              </div>
+                              {message.callFriendPhase === 'ringing' || message.callFriendPhase === 'connected' ? (
+                                <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+                              ) : message.callFriendPhase === 'complete' ? (
+                                <Check size={18} className="text-green-500" />
+                              ) : message.callFriendPhase === 'failed' || message.callFriendPhase === 'no_answer' ? (
+                                <X size={18} className="text-red-500" />
+                              ) : (
+                                <Loader2 size={18} className="animate-spin text-muted-foreground" />
+                              )}
+                            </div>
+
+                            {/* Transcript */}
+                            {message.callFriendTranscripts && message.callFriendTranscripts.length > 0 && (
+                              <div className="max-h-48 overflow-y-auto p-4 space-y-2 bg-background">
+                                {message.callFriendTranscripts.map((entry, idx) => (
+                                  <div
+                                    key={idx}
+                                    className={`flex ${entry.speaker === 'ai' ? 'justify-start' : entry.speaker === 'human' ? 'justify-end' : 'justify-center'}`}
+                                  >
+                                    <div
+                                      className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm ${
+                                        entry.speaker === 'ai'
+                                          ? 'bg-muted text-foreground'
+                                          : entry.speaker === 'human'
+                                          ? 'bg-primary text-primary-foreground'
+                                          : 'bg-muted/50 text-muted-foreground text-xs'
+                                      }`}
+                                    >
+                                      {entry.text}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </>
                     )}

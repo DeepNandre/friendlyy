@@ -7,12 +7,14 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from core import settings
 from models import ChatRequest, ChatResponse, AgentType
+import re
 from services.router import classify_intent
 from services.blitz import run_blitz_workflow
 from services.demo_mode import run_demo_workflow
 from services.build_agent import run_build_workflow
 from services.chat import generate_chat_response
 from services.inbox_agent import run_inbox_workflow
+from services.call_friend_agent import run_call_friend_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,38 @@ async def chat(
         f"Router params: service='{result.params.service}', location='{result.params.location}', timeframe='{result.params.timeframe}'"
     )
 
+    # Check for phone number follow-up (user providing number after we asked for call_friend)
+    if request.conversation_history:
+        # Check if user's message is primarily a phone number
+        phone_match = re.search(r'[\+]?[\d\s\-\(\)]{10,}', request.message)
+        if phone_match:
+            # Look for recent call_friend context in conversation
+            for msg in reversed(request.conversation_history):
+                if msg.role == "assistant":
+                    # Check for various phrases that indicate we asked for a phone number
+                    call_friend_indicators = [
+                        "phone number",
+                        "their number",
+                        "what's their",
+                        "provide me with",
+                        "call your friend",
+                        "call them",
+                        "connect with your friend",
+                    ]
+                    if any(indicator in msg.content.lower() for indicator in call_friend_indicators):
+                        return await _continue_call_friend(request, phone_match.group(), background_tasks)
+                    break  # Only check the most recent assistant message
+                elif msg.role == "user":
+                    # Check if user previously asked to call someone
+                    user_call_patterns = [
+                        r"call (?:my )?(?:friend|mate|pal|mom|dad|brother|sister)",
+                        r"ring (?:my )?(?:friend|mate|pal|mom|dad|brother|sister)",
+                        r"call \w+ and ask",
+                    ]
+                    if any(re.search(p, msg.content, re.IGNORECASE) for p in user_call_patterns):
+                        return await _continue_call_friend(request, phone_match.group(), background_tasks)
+                    break  # Only check the most recent user message before this one
+
     # Route based on agent type
     if result.agent == AgentType.BLITZ:
         return await _handle_blitz(request, result, background_tasks)
@@ -52,6 +86,8 @@ async def chat(
         return await _handle_queue(request, result, background_tasks)
     elif result.agent == AgentType.INBOX:
         return await _handle_inbox(request, result, background_tasks)
+    elif result.agent == AgentType.CALL_FRIEND:
+        return await _handle_call_friend(request, result, background_tasks)
     elif result.agent == AgentType.BID:
         return _handle_not_implemented("bid", result)
     else:
@@ -273,6 +309,112 @@ def _handle_not_implemented(agent_name: str, result) -> ChatResponse:
         agent=AgentType(agent_name),
         status="pending",
         message=f"The {agent_name.title()} agent is coming soon! For now, I can help you find services with Blitz.",
+    )
+
+
+async def _handle_call_friend(
+    request: ChatRequest,
+    result,
+    background_tasks: BackgroundTasks,
+) -> ChatResponse:
+    """Handle Call Friend agent requests — call a friend with a custom question."""
+    import uuid
+
+    session_id = str(uuid.uuid4())
+
+    # Extract friend name and question from params
+    friend_name = result.params.service or "your friend"
+    question = result.params.action or request.message
+    phone_number = result.params.notes  # Phone number might be in notes
+
+    # Also check message for phone number
+    if not phone_number:
+        phone_match = re.search(r'[\+]?[\d\s\-\(\)]{10,}', request.message)
+        if phone_match:
+            phone_number = re.sub(r'[^\d+]', '', phone_match.group())
+
+    # If no phone number, ask for it
+    if not phone_number:
+        # Store the friend name and question for follow-up
+        return ChatResponse(
+            session_id=session_id,
+            agent=AgentType.CALL_FRIEND,
+            status="awaiting_phone",
+            message=f"I'll call {friend_name} for you! What's their phone number?",
+        )
+
+    # Clean up phone number
+    phone_number = re.sub(r'[^\d+]', '', phone_number)
+
+    # Start call friend workflow
+    background_tasks.add_task(
+        run_call_friend_workflow,
+        session_id=session_id,
+        friend_name=friend_name,
+        phone_number=phone_number,
+        question=question,
+    )
+
+    return ChatResponse(
+        session_id=session_id,
+        agent=AgentType.CALL_FRIEND,
+        status="calling",
+        message=f"Calling {friend_name} now! I'll ask: \"{question}\"",
+        stream_url=f"/api/call_friend/stream/{session_id}",
+    )
+
+
+async def _continue_call_friend(
+    request: ChatRequest,
+    phone_number: str,
+    background_tasks: BackgroundTasks,
+) -> ChatResponse:
+    """Continue a call friend request after user provides phone number."""
+    import uuid
+
+    session_id = str(uuid.uuid4())
+
+    # Try to extract friend name and question from conversation history
+    friend_name = "your friend"
+    question = "checking in"
+
+    if request.conversation_history:
+        # Look for the original call_friend message in history
+        for msg in reversed(request.conversation_history):
+            if msg.role == "user" and ("call" in msg.content.lower() or "ring" in msg.content.lower()):
+                # This is likely the original request
+                question = msg.content
+                # Try to extract name
+                name_patterns = [
+                    r"call (?:my )?(?:friend |mate |pal )?(\w+)",
+                    r"ring (?:my )?(?:friend |mate |pal )?(\w+)",
+                    r"call (?:my )?(\w+)",
+                ]
+                for pattern in name_patterns:
+                    match = re.search(pattern, msg.content, re.IGNORECASE)
+                    if match:
+                        friend_name = match.group(1)
+                        break
+                break
+
+    # Clean up phone number
+    phone_number = re.sub(r'[^\d+]', '', phone_number)
+
+    # Start call friend workflow
+    background_tasks.add_task(
+        run_call_friend_workflow,
+        session_id=session_id,
+        friend_name=friend_name,
+        phone_number=phone_number,
+        question=question,
+    )
+
+    return ChatResponse(
+        session_id=session_id,
+        agent=AgentType.CALL_FRIEND,
+        status="calling",
+        message=f"Calling {friend_name} now!",
+        stream_url=f"/api/call_friend/stream/{session_id}",
     )
 
 
