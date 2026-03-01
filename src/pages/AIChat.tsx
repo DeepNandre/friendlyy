@@ -34,6 +34,12 @@ import {
 } from '../components/ui/prompt-input';
 import { PromptSuggestion } from '../components/ui/prompt-suggestion';
 import { ModelSelectorDropdown, MISTRAL_MODELS } from '../components/ui/model-selector';
+import {
+  ChatHistory,
+  useChatHistory,
+  generateSessionTitle,
+  getSessionType,
+} from '../components/ui/chat-history';
 
 type MessageRole = 'user' | 'assistant';
 type AgentType = 'blitz' | 'build' | 'chat' | null;
@@ -95,10 +101,72 @@ export default function AIChat() {
   const [activeBuildMessageId, setActiveBuildMessageId] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState('mixtral-8x7b');
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'blitz' | 'build'>('all');
+  const [activeTab, setActiveTab] = useState<'chat' | 'calls' | 'builds'>('chat');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Chat history hook for localStorage persistence
+  const chatHistory = useChatHistory();
 
   const stream = useBlitzStream(activeSessionId);
   const buildStream = useBuildStream(activeBuildSessionId);
+
+  // When selecting a session from history, load its messages
+  const handleSelectSession = (sessionId: string) => {
+    const session = chatHistory.sessions.find(s => s.id === sessionId);
+    if (session) {
+      chatHistory.selectSession(sessionId);
+      setMessages(session.messages || []);
+    }
+  };
+
+  // Save messages to current session whenever they change
+  useEffect(() => {
+    if (chatHistory.currentSessionId && messages.length > 0 && chatHistory.isLoaded) {
+      const firstUserMsg = messages.find(m => m.role === 'user');
+      const lastMsg = messages[messages.length - 1];
+      const sessionType = messages.find(m => m.agent)?.agent || 'chat';
+
+      chatHistory.updateSession(chatHistory.currentSessionId, {
+        messages,
+        title: firstUserMsg ? generateSessionTitle(firstUserMsg.content) : 'New Chat',
+        preview: lastMsg?.content?.substring(0, 60) || '',
+        type: sessionType as 'chat' | 'blitz' | 'build',
+      });
+    }
+  }, [messages, chatHistory.currentSessionId, chatHistory.isLoaded]);
+
+  // Start new chat
+  const handleNewChat = () => {
+    setMessages([]);
+    chatHistory.setCurrentSessionId(null);
+    setHistoryOpen(false);
+  };
+
+  // Sidebar button handlers
+  const handleHomeClick = () => {
+    handleNewChat();
+    setActiveTab('chat');
+  };
+
+  const handleChatClick = () => {
+    setHistoryOpen(!historyOpen);
+    setHistoryFilter('all');
+    setActiveTab('chat');
+  };
+
+  const handleCallsClick = () => {
+    setHistoryOpen(true);
+    setHistoryFilter('blitz');
+    setActiveTab('calls');
+  };
+
+  const handleBuildsClick = () => {
+    setHistoryOpen(true);
+    setHistoryFilter('build');
+    setActiveTab('builds');
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -185,6 +253,11 @@ export default function AIChat() {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
+    // Create a new session if we don't have one
+    if (!chatHistory.currentSessionId) {
+      chatHistory.createSession('chat');
+    }
+
     const userMessage: Message = { id: Date.now().toString(), role: 'user', content: input.trim(), timestamp: new Date() };
     setMessages((prev) => [...prev, userMessage]);
     const messageText = input.trim();
@@ -235,9 +308,17 @@ export default function AIChat() {
       if (data.agent === 'blitz' && data.session_id) {
         setActiveSessionId(data.session_id);
         setActiveMessageId(thinkingMessageId);
+        // Update session type to blitz
+        if (chatHistory.currentSessionId) {
+          chatHistory.updateSession(chatHistory.currentSessionId, { type: 'blitz' });
+        }
       } else if (data.agent === 'build' && data.session_id) {
         setActiveBuildSessionId(data.session_id);
         setActiveBuildMessageId(thinkingMessageId);
+        // Update session type to build
+        if (chatHistory.currentSessionId) {
+          chatHistory.updateSession(chatHistory.currentSessionId, { type: 'build' });
+        }
       } else {
         setIsLoading(false);
       }
@@ -276,23 +357,52 @@ export default function AIChat() {
           <img src="/friendly-logo-monochrome.jpg" alt="Friendly" className="w-full h-full object-contain" />
         </Link>
         <div className="flex flex-col gap-1 mt-2">
-          <button className="p-2.5 hover:bg-muted rounded-xl transition-colors text-muted-foreground hover:text-foreground">
+          <button
+            onClick={handleHomeClick}
+            className="p-2.5 hover:bg-muted rounded-xl transition-colors text-muted-foreground hover:text-foreground"
+            title="New Chat"
+          >
             <Home size={17} />
           </button>
-          <button className="p-2.5 bg-accent rounded-xl transition-colors text-accent-foreground">
+          <button
+            onClick={handleChatClick}
+            className={`p-2.5 rounded-xl transition-colors ${activeTab === 'chat' && historyOpen ? 'bg-accent text-accent-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}
+            title="Chat History"
+          >
             <MessageSquare size={17} />
           </button>
-          <button className="p-2.5 hover:bg-muted rounded-xl transition-colors text-muted-foreground hover:text-foreground">
+          <button
+            onClick={handleCallsClick}
+            className={`p-2.5 rounded-xl transition-colors ${activeTab === 'calls' ? 'bg-accent text-accent-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}
+            title="Call History"
+          >
             <Phone size={17} />
           </button>
-          <button className="p-2.5 hover:bg-muted rounded-xl transition-colors text-muted-foreground hover:text-foreground">
+          <button
+            onClick={handleBuildsClick}
+            className={`p-2.5 rounded-xl transition-colors ${activeTab === 'builds' ? 'bg-accent text-accent-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}
+            title="Build History"
+          >
             <Code size={17} />
           </button>
         </div>
-        <button className="mt-auto text-muted-foreground hover:text-foreground transition-colors">
+        <button className="mt-auto text-muted-foreground hover:text-foreground transition-colors" title="Settings">
           <Settings size={17} />
         </button>
       </aside>
+
+      {/* Chat History Sidebar */}
+      <ChatHistory
+        sessions={chatHistory.sessions}
+        currentSessionId={chatHistory.currentSessionId}
+        onSelectSession={handleSelectSession}
+        onNewChat={handleNewChat}
+        onDeleteSession={chatHistory.deleteSession}
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        filter={historyFilter}
+        onFilterChange={setHistoryFilter}
+      />
 
       {/* Chat Area */}
       <main className="flex-1 overflow-y-auto flex flex-col relative">

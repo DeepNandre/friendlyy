@@ -58,6 +58,12 @@ User: "was planning to find cleaners near me"
 User: "get quotes for bathroom cleaning in Wembley"
 {"agent": "blitz", "params": {"service": "bathroom cleaning", "location": "Wembley", "action": "quote"}, "confidence": 0.95}
 
+User: "I need to get my carpets cleaned, can you find a reliable service?"
+{"agent": "blitz", "params": {"service": "carpet cleaning", "action": "find"}, "confidence": 0.95}
+
+User: "find carpet cleaners in 12345"
+{"agent": "blitz", "params": {"service": "carpet cleaning", "location": "12345", "action": "find"}, "confidence": 0.95}
+
 User: "looking for a locksmith in London"
 {"agent": "blitz", "params": {"service": "locksmith", "location": "London", "action": "find"}, "confidence": 0.95}
 

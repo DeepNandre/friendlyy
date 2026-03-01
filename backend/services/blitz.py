@@ -25,6 +25,7 @@ from models import (
     RouterParams,
     Business,
 )
+from services.chat import generate_agent_summary
 from services.places import search_businesses
 from services.twilio_caller import initiate_parallel_calls
 from services.weave_tracing import (
@@ -217,10 +218,22 @@ async def run_blitz_workflow(
         # Step 5: Wait for all calls to complete
         await _wait_for_calls_completion(session, timeout=120)
 
-        # Step 6: Generate summary
+        # Step 6: Generate warm, funny summary via Mistral
         session.status = SessionStatus.COMPLETE
         session.completed_at = datetime.utcnow()
-        session.summary = _generate_summary(session)
+        call_results = [
+            {
+                "business": c.business.name,
+                "status": c.status.value,
+                "result": c.result or "",
+            }
+            for c in session.calls
+        ]
+        session.summary = await generate_agent_summary(
+            user_request=session.user_message,
+            service_type=session.parsed_params.service or "business",
+            call_results=call_results,
+        )
 
         await emit_event(
             session.id,
@@ -336,23 +349,6 @@ async def _wait_for_calls_completion(
             break
 
         await asyncio.sleep(3)
-
-
-def _generate_summary(session: BlitzSession) -> str:
-    """Generate human-readable summary of call results."""
-    successful = [
-        c for c in session.calls if c.status == CallStatus.COMPLETE and c.result
-    ]
-
-    if not successful:
-        failed_count = len(session.calls)
-        return f"I called {failed_count} {session.parsed_params.service or 'businesses'} but couldn't get through to any of them. Would you like me to try different ones?"
-
-    results_text = "\n".join(
-        [f"- {c.business.name}: {c.result}" for c in successful]
-    )
-
-    return f"Found {len(successful)} options for you:\n\n{results_text}"
 
 
 async def cleanup_session(session_id: str) -> None:
