@@ -45,7 +45,7 @@ async def chat(
     elif result.agent == AgentType.BOUNCE:
         return _handle_not_implemented("bounce", result)
     elif result.agent == AgentType.QUEUE:
-        return _handle_not_implemented("queue", result)
+        return await _handle_queue(request, result, background_tasks)
     elif result.agent == AgentType.BID:
         return _handle_not_implemented("bid", result)
     else:
@@ -159,6 +159,54 @@ async def _handle_build(
         status="building",
         message=f"On it! Let me build a {site_type} for you...",
         stream_url=f"/api/build/stream/{session_id}",
+    )
+
+
+async def _handle_queue(
+    request: ChatRequest,
+    result,
+    background_tasks: BackgroundTasks,
+) -> ChatResponse:
+    """Handle Queue agent requests — wait on hold for the user."""
+    import uuid
+    from services.queue_agent import run_queue_workflow
+
+    session_id = str(uuid.uuid4())
+
+    # Extract phone number and business from params
+    phone_number = result.params.notes or ""  # Phone number might be in notes
+    business_name = result.params.service or "Unknown"
+    reason = result.params.action or "general enquiry"
+
+    # If no phone number found, ask the user
+    if not phone_number or not any(c.isdigit() for c in phone_number):
+        return ChatResponse(
+            session_id=session_id,
+            agent=AgentType.QUEUE,
+            status="pending",
+            message=f"I can wait on hold at {business_name} for you! What's their phone number?",
+        )
+
+    # Start queue workflow in background
+    async def _run_queue():
+        try:
+            await run_queue_workflow(
+                phone_number=phone_number,
+                business_name=business_name,
+                reason=reason,
+                session_id=session_id,
+            )
+        except Exception as e:
+            logger.error(f"Queue workflow error: {e}")
+
+    background_tasks.add_task(_run_queue)
+
+    return ChatResponse(
+        session_id=session_id,
+        agent=AgentType.QUEUE,
+        status="calling",
+        message=f"On it! I'm calling {business_name} and will wait on hold for you. I'll let you know when a human picks up.",
+        stream_url=f"/api/blitz/stream/{session_id}",
     )
 
 

@@ -12,9 +12,9 @@ from core.redis_client import (
     save_session,
     get_session,
     delete_session,
-    push_event,
     clear_events,
 )
+from core.events import emit_event
 from models import (
     BlitzSession,
     CallRecord,
@@ -28,25 +28,6 @@ from services.places import search_businesses
 from services.twilio_caller import initiate_parallel_calls
 
 logger = logging.getLogger(__name__)
-
-
-async def emit_event(session_id: str, event_type: str, data: Dict[str, Any]) -> None:
-    """
-    Emit an SSE event for a session.
-
-    Args:
-        session_id: Session ID
-        event_type: Event type (status, call_started, etc.)
-        data: Event data
-    """
-    await push_event(
-        session_id,
-        {
-            "event": event_type,
-            "data": data,
-            "timestamp": datetime.utcnow().isoformat(),
-        },
-    )
 
 
 async def get_session_state(session_id: str) -> Optional[BlitzSession]:
