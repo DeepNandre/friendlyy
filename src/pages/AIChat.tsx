@@ -357,9 +357,10 @@ export default function AIChat() {
                           </div>
                         )}
 
-                        {/* Build Widget */}
-                        {message.agent === 'build' && message.buildSteps && message.buildSteps.length > 0 && (
+                        {/* Build / VibeCoder Widget */}
+                        {message.agent === 'build' && (
                           <div className="border border-border rounded-2xl bg-card overflow-hidden mt-1 shadow-sm">
+                            {/* Header */}
                             <div className="flex justify-between items-center px-4 py-3 bg-accent/20 border-b border-border">
                               <div className="flex items-center gap-2">
                                 <div className="bg-foreground text-background p-1.5 rounded-lg">
@@ -367,38 +368,82 @@ export default function AIChat() {
                                 </div>
                                 <span className="font-semibold text-foreground text-sm font-sans">VibeCoder</span>
                               </div>
-                              <span className="text-xs text-muted-foreground font-sans">
-                                {message.buildSteps.filter(s => s.status === 'complete').length}/{message.buildSteps.length} steps
-                              </span>
-                            </div>
-                            <div className="divide-y divide-border">
-                              {message.buildSteps.map((step) => (
-                                <div key={step.id} className="flex items-center gap-3 px-4 py-3">
-                                  {step.status === 'complete' ? (
-                                    <Check size={13} className="text-foreground shrink-0" />
-                                  ) : step.status === 'in_progress' ? (
-                                    <Loader2 size={13} className="text-foreground animate-spin shrink-0" />
-                                  ) : step.status === 'error' ? (
-                                    <X size={13} className="text-destructive shrink-0" />
-                                  ) : (
-                                    <Clock size={13} className="text-muted-foreground shrink-0" />
-                                  )}
-                                  <span className={`text-sm font-sans ${step.status === 'complete' ? 'text-foreground' : step.status === 'in_progress' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                                    {step.label}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                            {message.previewUrl && (
-                              <div className="px-4 py-3 border-t border-border bg-accent/10">
+                              {message.buildSteps && message.buildSteps.length > 0 ? (
+                                <span className="text-xs text-muted-foreground font-sans">
+                                  {message.buildSteps.filter(s => s.status === 'complete').length}/{message.buildSteps.length} steps
+                                </span>
+                              ) : message.previewUrl ? (
                                 <a
                                   href={message.previewUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-xl text-sm font-medium font-sans hover:opacity-80 transition-opacity"
+                                  className="text-xs text-foreground font-sans font-medium flex items-center gap-1 hover:opacity-70 transition-opacity"
                                 >
-                                  View Preview <ExternalLink size={13} />
+                                  Open in new tab <ExternalLink size={11} />
                                 </a>
+                              ) : null}
+                            </div>
+
+                            {/* Build Steps */}
+                            {message.buildSteps && message.buildSteps.length > 0 && (
+                              <div className="divide-y divide-border">
+                                {message.buildSteps.map((step) => (
+                                  <div key={step.id} className="flex items-center gap-3 px-4 py-3">
+                                    {step.status === 'complete' ? (
+                                      <Check size={13} className="text-foreground shrink-0" />
+                                    ) : step.status === 'in_progress' ? (
+                                      <Loader2 size={13} className="text-foreground animate-spin shrink-0" />
+                                    ) : step.status === 'error' ? (
+                                      <X size={13} className="text-destructive shrink-0" />
+                                    ) : (
+                                      <Clock size={13} className="text-muted-foreground shrink-0" />
+                                    )}
+                                    <span className={`text-sm font-sans ${step.status === 'complete' ? 'text-foreground' : step.status === 'in_progress' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                                      {step.label}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Loading state - before SSE events arrive */}
+                            {(!message.buildSteps || message.buildSteps.length === 0) && !message.previewUrl && (
+                              <div className="px-4 py-6 flex flex-col items-center gap-3">
+                                <Loader2 size={24} className="text-foreground animate-spin" />
+                                <p className="text-sm text-muted-foreground font-sans">
+                                  Setting up your build...
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Inline Preview iframe */}
+                            {message.previewUrl && (
+                              <div className="border-t border-border">
+                                <div className="w-full bg-muted/30" style={{ height: '400px' }}>
+                                  <iframe
+                                    title="Website Preview"
+                                    src={message.previewUrl}
+                                    className="w-full h-full border-0"
+                                    sandbox="allow-same-origin"
+                                    loading="lazy"
+                                  />
+                                </div>
+                                <div className="px-4 py-3 border-t border-border bg-accent/10 flex items-center gap-2">
+                                  <a
+                                    href={message.previewUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-xl text-sm font-medium font-sans hover:opacity-80 transition-opacity"
+                                  >
+                                    View Preview <ExternalLink size={13} />
+                                  </a>
+                                  <a
+                                    href={`/vibecoder?preview=${message.previewUrl.split('/').pop()}`}
+                                    className="inline-flex items-center gap-2 px-4 py-2 border border-border text-foreground rounded-xl text-sm font-medium font-sans hover:bg-muted transition-colors"
+                                  >
+                                    Open Editor <ChevronRight size={13} />
+                                  </a>
+                                </div>
                               </div>
                             )}
                           </div>
