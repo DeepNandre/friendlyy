@@ -33,7 +33,7 @@ import {
   PromptInputSubmit,
 } from '../components/ui/prompt-input';
 import { PromptSuggestion } from '../components/ui/prompt-suggestion';
-import { ModelSelector, MISTRAL_MODELS } from '../components/ui/model-selector';
+import { ModelSelectorDropdown, MISTRAL_MODELS } from '../components/ui/model-selector';
 
 type MessageRole = 'user' | 'assistant';
 type AgentType = 'blitz' | 'build' | 'chat' | null;
@@ -573,18 +573,6 @@ export default function AIChat() {
               <PromptInputBottomBar>
                 <PromptInputChips>
                   <PromptInputChip
-                    icon={<Code size={14} />}
-                    onClick={() => setInput('Build me ')}
-                  >
-                    VibeCoder
-                  </PromptInputChip>
-                  <PromptInputChip
-                    icon={<Phone size={14} />}
-                    onClick={() => setInput('Find me a ')}
-                  >
-                    Call Agent
-                  </PromptInputChip>
-                  <PromptInputChip
                     icon={<Globe size={14} />}
                     active={webSearchEnabled}
                     onClick={() => setWebSearchEnabled(!webSearchEnabled)}
@@ -593,6 +581,11 @@ export default function AIChat() {
                   </PromptInputChip>
                 </PromptInputChips>
                 <PromptInputActions>
+                  <ModelSelectorDropdown
+                    models={MISTRAL_MODELS}
+                    selectedModel={selectedModel}
+                    onModelChange={setSelectedModel}
+                  />
                   <PromptInputAction tooltip="Attach file" side="top">
                     <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
                       <Paperclip size={18} />
@@ -605,14 +598,6 @@ export default function AIChat() {
                 </PromptInputActions>
               </PromptInputBottomBar>
             </PromptInput>
-
-            {/* Model Selector */}
-            <ModelSelector
-              models={MISTRAL_MODELS}
-              selectedModel={selectedModel}
-              onModelChange={setSelectedModel}
-              className="pt-2"
-            />
 
             <p className="text-center text-[11px] text-muted-foreground font-sans">
               Friendly AI can make mistakes. Verify important information.

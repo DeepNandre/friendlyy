@@ -2,7 +2,15 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { Check } from "lucide-react"
+import { Check, ChevronDown } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
 
 export interface ModelOption {
   id: string
@@ -57,6 +65,47 @@ const NvidiaLogo = () => (
     <path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.424 0-.83-.062-1.167-.169v-5.608zm0-4.595V2.862l.34-.01c5.53-.173 9.248 4.429 9.248 4.429s-4.283 5.47-8.043 5.47c-.536 0-1.05-.079-1.545-.229V8.798c1.678.16 2.012.947 3.03 2.355l2.273-1.89s-1.607-2.021-4.132-2.021c-.44 0-.82.044-1.17.116V4.203zM8.948 19.25V17.4c.404.112.834.17 1.284.17 2.49 0 4.3-1.933 4.3-1.933l3.5 2.753s-2.89 3.49-7.467 3.49c-.568 0-1.114-.077-1.617-.224v-2.406zm-1.324-9.12V7.362H5.87C2.891 8.93 2 12.327 2 12.327s1.95 4.6 6.05 5.187v-2.093c-2.537-.5-3.675-2.81-3.675-2.81s.876-1.766 3.25-2.483z" fill="#76B900"/>
   </svg>
 )
+
+// Dropdown variant - compact button that opens model picker
+export function ModelSelectorDropdown({
+  models,
+  selectedModel,
+  onModelChange,
+  className,
+}: ModelSelectorProps) {
+  const selected = models.find((m) => m.id === selectedModel)
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "h-8 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground font-medium",
+            className
+          )}
+        >
+          {selected?.icon}
+          <span className="text-xs">{selected?.name ?? "Select model"}</span>
+          <ChevronDown size={14} className="opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[180px]">
+        <DropdownMenuRadioGroup value={selectedModel} onValueChange={onModelChange}>
+          {models.map((model) => (
+            <DropdownMenuRadioItem key={model.id} value={model.id}>
+              <span className="flex items-center gap-2">
+                {model.icon}
+                {model.name}
+              </span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
 export function ModelSelector({
   models,
