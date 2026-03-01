@@ -149,6 +149,61 @@ async def debug_places(query: str, location: str):
     }
 
 
+@app.get("/debug/call")
+async def debug_call(phone: str):
+    """Debug endpoint - make a test call to verify Twilio works."""
+    from twilio.rest import Client
+    from twilio.twiml.voice_response import VoiceResponse
+
+    if not settings.twilio_account_sid or not settings.twilio_auth_token:
+        return {"error": "Twilio not configured"}
+
+    client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
+
+    # Create simple TwiML that just says hello
+    twiml_url = f"{settings.backend_url}/debug/twiml"
+
+    try:
+        call = client.calls.create(
+            to=phone,
+            from_=settings.twilio_phone_number,
+            url=twiml_url,
+            status_callback=f"{settings.backend_url}/debug/call-status",
+            timeout=30,
+        )
+        return {
+            "success": True,
+            "call_sid": call.sid,
+            "to": phone,
+            "from": settings.twilio_phone_number,
+            "twiml_url": twiml_url,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/debug/twiml")
+@app.get("/debug/twiml")
+async def debug_twiml():
+    """Simple TwiML for test calls."""
+    from twilio.twiml.voice_response import VoiceResponse
+    from fastapi.responses import Response
+
+    response = VoiceResponse()
+    response.say("Hello! This is a test call from Friendly. The system is working correctly. Goodbye!", voice="Polly.Amy")
+    response.hangup()
+
+    return Response(content=str(response), media_type="application/xml")
+
+
+@app.post("/debug/call-status")
+async def debug_call_status(request: Request):
+    """Log call status for debugging."""
+    form = await request.form()
+    logger.info(f"[DEBUG CALL STATUS] {dict(form)}")
+    return {"status": "ok"}
+
+
 @app.get("/api")
 async def api_root():
     """API root - list available endpoints."""
