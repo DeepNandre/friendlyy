@@ -9,6 +9,7 @@ from fastapi import APIRouter, Form, Query, Request
 from core.redis_client import get_session, save_session
 from models import CallStatus, SessionStatus
 from services.blitz import emit_event, get_session_state
+from services.twilio_caller import TWILIO_STATUS_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ router = APIRouter()
 async def twilio_status_callback(
     request: Request,
     CallSid: str = Form(...),
-    CallStatus: str = Form(...),
+    call_status_value: str = Form(..., alias="CallStatus"),
     From: Optional[str] = Form(None),
     To: Optional[str] = Form(None),
 ):
@@ -35,7 +36,7 @@ async def twilio_status_callback(
     - no-answer
     - failed
     """
-    logger.info(f"Twilio webhook: {CallSid} -> {CallStatus}")
+    logger.info(f"Twilio webhook: {CallSid} -> {call_status_value}")
 
     # Extract session_id from query params if present
     # (We include it in the callback URL)
@@ -64,23 +65,9 @@ async def twilio_status_callback(
         logger.warning(f"Call record not found for SID: {CallSid}")
         return {"status": "ok"}
 
-    # Map Twilio status to our status
-    status_map = {
-        "initiated": CallStatus.PENDING,
-        "ringing": CallStatus.RINGING,
-        "in-progress": CallStatus.CONNECTED,
-        "answered": CallStatus.CONNECTED,
-        "completed": CallStatus.COMPLETE,
-        "busy": CallStatus.BUSY,
-        "no-answer": CallStatus.NO_ANSWER,
-        "failed": CallStatus.FAILED,
-        "canceled": CallStatus.FAILED,
-    }
-
-    twilio_status = CallStatus.lower() if isinstance(CallStatus, str) else CallStatus
-    # Note: shadowing the import name, so using the form value directly
-    status_str = request._form.get("CallStatus", "").lower()
-    new_status = status_map.get(status_str, CallStatus.FAILED)
+    # Map Twilio status to internal status using shared constant
+    status_str = call_status_value.lower()
+    new_status = TWILIO_STATUS_MAP.get(status_str, CallStatus.FAILED)
     call_record.status = new_status
 
     # Emit appropriate event
@@ -120,6 +107,61 @@ async def twilio_status_callback(
 
     # Save updated session
     await save_session(session_id, session.model_dump(mode="json"))
+
+    return {"status": "ok"}
+
+
+@router.post("/amd")
+async def answering_machine_detection(
+    request: Request,
+    CallSid: str = Form(None),
+    AnsweredBy: str = Form(None),
+):
+    """
+    Handle async Answering Machine Detection (AMD) callback.
+
+    If voicemail/machine is detected, hang up the call immediately
+    instead of playing the script to a machine.
+    """
+    params = dict(request.query_params)
+    session_id = params.get("session_id")
+    call_id = params.get("call_id")
+
+    logger.info(f"AMD callback: {CallSid} -> AnsweredBy={AnsweredBy}")
+
+    if AnsweredBy and AnsweredBy in ("machine_start", "machine_end_beep", "machine_end_silence", "machine_end_other", "fax"):
+        logger.info(f"Voicemail/machine detected for {CallSid}, hanging up")
+
+        # Hang up the call via Twilio API
+        try:
+            from services.twilio_caller import get_twilio_client
+            client = get_twilio_client()
+            if client and CallSid:
+                client.calls(CallSid).update(status="completed")
+        except Exception as e:
+            logger.error(f"Failed to hang up machine call {CallSid}: {e}")
+
+        # Update session if we have the info
+        if session_id:
+            session = await get_session_state(session_id)
+            if session:
+                for call in session.calls:
+                    if call.call_sid == CallSid or call.id == call_id:
+                        call.status = CallStatus.FAILED
+                        call.error = "Voicemail detected"
+                        break
+                await save_session(session_id, session.model_dump(mode="json"))
+                await emit_event(
+                    session_id,
+                    "call_failed",
+                    {
+                        "business": next(
+                            (c.business.name for c in session.calls if c.call_sid == CallSid or c.id == call_id),
+                            "Unknown",
+                        ),
+                        "error": "Voicemail detected - hung up",
+                    },
+                )
 
     return {"status": "ok"}
 
