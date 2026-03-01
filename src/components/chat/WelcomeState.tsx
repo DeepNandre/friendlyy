@@ -1,4 +1,4 @@
-import { Sparkles, Phone, Code, Clock } from 'lucide-react';
+import { Phone, Code, Clock } from 'lucide-react';
 
 interface WelcomeStateProps {
   onSendMessage: (text: string) => void;
@@ -13,8 +13,8 @@ const QUICK_ACTIONS = [
 export default function WelcomeState({ onSendMessage }: WelcomeStateProps) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center max-w-lg mx-auto gap-6 min-h-[60vh]">
-      <div className="w-20 h-20 rounded-[22px] bg-foreground flex items-center justify-center text-background shadow-2xl shadow-foreground/20">
-        <Sparkles size={32} />
+      <div className="w-20 h-20 rounded-[22px] bg-background flex items-center justify-center p-2 shadow-2xl shadow-foreground/20 border border-border overflow-hidden">
+        <img src="/friendly-logo-monochrome.jpg" alt="Friendly" className="w-full h-full object-contain" />
       </div>
       <div>
         <h1 className="text-3xl sm:text-4xl font-serif text-foreground mb-3">Hey, I'm Friendly</h1>
