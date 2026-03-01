@@ -12,6 +12,7 @@ class AgentType(str, Enum):
     BOUNCE = "bounce"  # Cancel subscriptions
     QUEUE = "queue"  # Wait on hold for someone
     BID = "bid"  # Negotiate bills lower
+    BUILD = "build"  # Build websites, apps, landing pages
     CHAT = "chat"  # General conversation
 
 

@@ -13,11 +13,14 @@ import {
   ChevronRight,
   Zap,
   MessageSquare,
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import { useBlitzStream, CallStatusType } from '../hooks/useBlitzStream';
+import { useBuildStream, BuildStep } from '../hooks/useBuildStream';
 
 type MessageRole = 'user' | 'assistant';
-type AgentType = 'blitz' | 'vibecoder' | 'chat' | null;
+type AgentType = 'blitz' | 'build' | 'chat' | null;
 
 interface CallStatus {
   business: string;
@@ -35,6 +38,8 @@ interface Message {
   agent?: AgentType;
   sessionId?: string;
   callStatuses?: CallStatus[];
+  buildSteps?: BuildStep[];
+  previewUrl?: string;
   isThinking?: boolean;
   thinkingTime?: number;
 }
@@ -48,10 +53,13 @@ export default function AIChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [activeBuildSessionId, setActiveBuildSessionId] = useState<string | null>(null);
+  const [activeBuildMessageId, setActiveBuildMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const stream = useBlitzStream(activeSessionId);
+  const buildStream = useBuildStream(activeBuildSessionId);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -86,6 +94,44 @@ export default function AIChat() {
       setActiveMessageId(null);
     }
   }, [stream, activeMessageId, activeSessionId]);
+
+  // Build stream effect
+  useEffect(() => {
+    if (!activeBuildMessageId || !activeBuildSessionId) return;
+
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== activeBuildMessageId) return msg;
+        let content = msg.content;
+        if (buildStream.buildStatus === 'building' && buildStream.message) {
+          content = buildStream.message;
+        } else if (buildStream.buildStatus === 'complete' && buildStream.message) {
+          content = buildStream.message;
+        } else if (buildStream.buildStatus === 'error') {
+          content = buildStream.error || 'Something went wrong building your site.';
+        } else if (buildStream.buildStatus === 'clarification' && buildStream.clarification) {
+          content = buildStream.clarification;
+        }
+        return {
+          ...msg,
+          content,
+          isThinking: false,
+          buildSteps: buildStream.steps.length > 0 ? buildStream.steps : msg.buildSteps,
+          previewUrl: buildStream.previewUrl || msg.previewUrl,
+        };
+      })
+    );
+
+    if (
+      buildStream.buildStatus === 'complete' ||
+      buildStream.buildStatus === 'error' ||
+      buildStream.buildStatus === 'clarification'
+    ) {
+      setIsLoading(false);
+      setActiveBuildSessionId(null);
+      setActiveBuildMessageId(null);
+    }
+  }, [buildStream, activeBuildMessageId, activeBuildSessionId]);
 
   const mapCallStatus = (status: CallStatusType): CallStatus['status'] => {
     switch (status) {
@@ -131,6 +177,7 @@ export default function AIChat() {
             isThinking: false,
             thinkingTime: 2,
             callStatuses: data.agent === 'blitz' ? [] : undefined,
+            buildSteps: data.agent === 'build' ? [] : undefined,
           }
         )
       );
@@ -138,6 +185,9 @@ export default function AIChat() {
       if (data.agent === 'blitz' && data.session_id) {
         setActiveSessionId(data.session_id);
         setActiveMessageId(thinkingMessageId);
+      } else if (data.agent === 'build' && data.session_id) {
+        setActiveBuildSessionId(data.session_id);
+        setActiveBuildMessageId(thinkingMessageId);
       } else {
         setIsLoading(false);
       }
@@ -307,8 +357,8 @@ export default function AIChat() {
                           </div>
                         )}
 
-                        {/* VibeCoder Widget */}
-                        {message.agent === 'vibecoder' && (
+                        {/* Build Widget */}
+                        {message.agent === 'build' && message.buildSteps && message.buildSteps.length > 0 && (
                           <div className="border border-border rounded-2xl bg-card overflow-hidden mt-1 shadow-sm">
                             <div className="flex justify-between items-center px-4 py-3 bg-accent/20 border-b border-border">
                               <div className="flex items-center gap-2">
@@ -317,13 +367,40 @@ export default function AIChat() {
                                 </div>
                                 <span className="font-semibold text-foreground text-sm font-sans">VibeCoder</span>
                               </div>
-                              <button className="text-xs text-foreground font-medium font-sans flex items-center gap-1 hover:opacity-70 transition-opacity">
-                                Open Editor <ChevronRight size={13} />
-                              </button>
+                              <span className="text-xs text-muted-foreground font-sans">
+                                {message.buildSteps.filter(s => s.status === 'complete').length}/{message.buildSteps.length} steps
+                              </span>
                             </div>
-                            <div className="p-4 text-sm text-muted-foreground font-sans">
-                              Ready to build your project. Click to open the VibeCoder editor.
+                            <div className="divide-y divide-border">
+                              {message.buildSteps.map((step) => (
+                                <div key={step.id} className="flex items-center gap-3 px-4 py-3">
+                                  {step.status === 'complete' ? (
+                                    <Check size={13} className="text-foreground shrink-0" />
+                                  ) : step.status === 'in_progress' ? (
+                                    <Loader2 size={13} className="text-foreground animate-spin shrink-0" />
+                                  ) : step.status === 'error' ? (
+                                    <X size={13} className="text-destructive shrink-0" />
+                                  ) : (
+                                    <Clock size={13} className="text-muted-foreground shrink-0" />
+                                  )}
+                                  <span className={`text-sm font-sans ${step.status === 'complete' ? 'text-foreground' : step.status === 'in_progress' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                                    {step.label}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
+                            {message.previewUrl && (
+                              <div className="px-4 py-3 border-t border-border bg-accent/10">
+                                <a
+                                  href={message.previewUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-xl text-sm font-medium font-sans hover:opacity-80 transition-opacity"
+                                >
+                                  View Preview <ExternalLink size={13} />
+                                </a>
+                              </div>
+                            )}
                           </div>
                         )}
                       </>

@@ -10,6 +10,7 @@ from models import ChatRequest, ChatResponse, AgentType
 from services.router import classify_intent
 from services.blitz import run_blitz_workflow
 from services.demo_mode import run_demo_workflow
+from services.build_agent import run_build_workflow
 from services.chat import generate_chat_response
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,8 @@ async def chat(
     # Route based on agent type
     if result.agent == AgentType.BLITZ:
         return await _handle_blitz(request, result, background_tasks)
+    elif result.agent == AgentType.BUILD:
+        return await _handle_build(request, result, background_tasks)
     elif result.agent == AgentType.BOUNCE:
         return _handle_not_implemented("bounce", result)
     elif result.agent == AgentType.QUEUE:
@@ -130,6 +133,33 @@ async def _run_background_workflow(session, demo_mode: bool):
             )
     except Exception as e:
         logger.error(f"Background workflow error: {e}")
+
+
+async def _handle_build(
+    request: ChatRequest,
+    result,
+    background_tasks: BackgroundTasks,
+) -> ChatResponse:
+    """Handle Build agent requests."""
+    import uuid
+
+    session_id = str(uuid.uuid4())
+    site_type = result.params.service or "website"
+
+    background_tasks.add_task(
+        run_build_workflow,
+        user_message=request.message,
+        params=result.params,
+        session_id=session_id,
+    )
+
+    return ChatResponse(
+        session_id=session_id,
+        agent=AgentType.BUILD,
+        status="building",
+        message=f"On it! Let me build a {site_type} for you...",
+        stream_url=f"/api/build/stream/{session_id}",
+    )
 
 
 def _handle_not_implemented(agent_name: str, result) -> ChatResponse:
