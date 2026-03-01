@@ -42,8 +42,17 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> List[str]:
-        """Parse CORS origins into a list."""
-        return [origin.strip() for origin in self.cors_origins.split(",")]
+        """Parse CORS origins into a list, ensuring proper URL format."""
+        origins = []
+        for origin in self.cors_origins.split(","):
+            origin = origin.strip()
+            if not origin:
+                continue
+            # Auto-add https:// if missing protocol
+            if not origin.startswith("http://") and not origin.startswith("https://"):
+                origin = f"https://{origin}"
+            origins.append(origin)
+        return origins
 
     class Config:
         env_file = ".env"
