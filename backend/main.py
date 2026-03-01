@@ -132,6 +132,7 @@ async def debug_config():
         "twilio_configured": bool(settings.twilio_account_sid and settings.twilio_auth_token),
         "twilio_phone": settings.twilio_phone_number[:6] + "***" if settings.twilio_phone_number else None,
         "elevenlabs_configured": bool(settings.elevenlabs_api_key),
+        "elevenlabs_key_prefix": settings.elevenlabs_api_key[:8] + "..." if settings.elevenlabs_api_key else None,
         "google_places_configured": bool(settings.google_places_api_key),
         "redis_url": settings.redis_url.split("@")[-1] if "@" in settings.redis_url else "localhost",
     }
@@ -200,22 +201,35 @@ async def debug_twiml():
 @app.get("/debug/tts")
 async def debug_tts():
     """Generate ElevenLabs audio for test call."""
-    from fastapi.responses import Response
+    from fastapi.responses import Response, JSONResponse
     from services.elevenlabs_voice import generate_tts_audio
 
     text = "Hello! This is a test call from Friendly. I'm speaking with a natural voice powered by Eleven Labs. The system is working perfectly. Goodbye!"
 
-    audio = await generate_tts_audio(text)
+    logger.info(f"[DEBUG TTS] Generating audio for: {text[:50]}...")
+
+    audio = await generate_tts_audio(text, use_cache=False)  # Disable cache for testing
 
     if not audio:
-        # Fallback to empty audio if ElevenLabs fails
-        logger.error("ElevenLabs TTS failed for debug call")
-        return Response(content=b"", media_type="audio/mpeg")
+        logger.error("[DEBUG TTS] ElevenLabs returned no audio!")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "ElevenLabs TTS failed",
+                "elevenlabs_configured": bool(settings.elevenlabs_api_key),
+                "api_key_prefix": settings.elevenlabs_api_key[:10] + "..." if settings.elevenlabs_api_key else None,
+            },
+        )
+
+    logger.info(f"[DEBUG TTS] Success! Returning {len(audio)} bytes of audio")
 
     return Response(
         content=audio,
         media_type="audio/mpeg",
-        headers={"Content-Disposition": "inline"},
+        headers={
+            "Content-Disposition": "inline",
+            "Content-Length": str(len(audio)),
+        },
     )
 
 

@@ -1,6 +1,8 @@
 """
 ElevenLabs TTS integration with Redis caching.
 Generates AI voice for phone calls.
+
+API Reference: https://elevenlabs.io/docs/api-reference/text-to-speech/convert
 """
 
 import logging
@@ -13,13 +15,21 @@ from services.weave_tracing import traced, log_tts_generation, get_trace_ctx
 
 logger = logging.getLogger(__name__)
 
+# ElevenLabs API endpoint
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1"
 
-# Voice IDs - Rachel is a professional female voice
+# Voice IDs from ElevenLabs
+# Rachel (default professional female): 21m00Tcm4TlvDq8ikWAM
+# George (British male): JBFqnCBsd6RMkjVDRZzb
+# Sarah (soft female): EXAVITQu4vr4xnSDxMaL
 DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # Rachel
 
+# Output format optimized for phone calls (Twilio recommends lower bitrate)
+# See: https://www.twilio.com/docs/voice/twiml/play
+OUTPUT_FORMAT = "mp3_22050_32"  # 22.05kHz, 32kbps - optimal for telephony
+
 VOICE_SETTINGS = {
-    "stability": 0.75,
+    "stability": 0.5,  # Lower = more expressive
     "similarity_boost": 0.75,
     "style": 0.0,
     "use_speaker_boost": True,
@@ -75,31 +85,42 @@ async def generate_tts_audio(
 
     try:
         client = await get_http_client()
-        response = await client.post(
-            f"{ELEVENLABS_API_URL}/text-to-speech/{voice_id}",
-            headers={
-                "xi-api-key": settings.elevenlabs_api_key,
-                "Content-Type": "application/json",
-            },
-            json={
-                "text": text,
-                "model_id": "eleven_multilingual_v2",
-                "voice_settings": VOICE_SETTINGS,
-            },
-        )
 
-        response.raise_for_status()
+        # Build request per ElevenLabs API docs
+        url = f"{ELEVENLABS_API_URL}/text-to-speech/{voice_id}"
+        headers = {
+            "xi-api-key": settings.elevenlabs_api_key,
+            "Content-Type": "application/json",
+            "Accept": "audio/mpeg",
+        }
+        payload = {
+            "text": text,
+            "model_id": "eleven_multilingual_v2",
+            "voice_settings": VOICE_SETTINGS,
+            "output_format": OUTPUT_FORMAT,
+        }
+
+        logger.info(f"[ElevenLabs] Requesting TTS for: '{text[:50]}...'")
+        logger.info(f"[ElevenLabs] URL: {url}, Voice: {voice_id}")
+
+        response = await client.post(url, headers=headers, json=payload, timeout=30.0)
+
+        if response.status_code != 200:
+            logger.error(f"[ElevenLabs] API error {response.status_code}: {response.text[:500]}")
+            return None
+
         audio_data = response.content
+        logger.info(f"[ElevenLabs] Success! Audio size: {len(audio_data)} bytes")
 
         # Cache the audio
-        if use_cache:
+        if use_cache and audio_data:
             await cache_audio(text, audio_data)
             logger.info(f"TTS cached for text: {text[:30]}...")
 
         return audio_data
 
     except Exception as e:
-        logger.error(f"ElevenLabs TTS failed: {e}")
+        logger.error(f"[ElevenLabs] TTS failed with exception: {type(e).__name__}: {e}")
         return None
 
 
