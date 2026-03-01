@@ -17,7 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from core import settings
 from core.http_client import http_client_lifespan, close_http_client
 from core.redis_client import close_redis_client
-from api import chat_router, blitz_router, build_router, stream_router, webhooks_router, queue_router, traces_router, inbox_router, media_stream_router
+from api import chat_router, blitz_router, build_router, stream_router, webhooks_router, queue_router, traces_router, inbox_router, media_stream_router, call_friend_router
 from services.weave_tracing import load_traces_from_redis
 
 # Configure logging
@@ -107,6 +107,7 @@ app.include_router(build_router, prefix="/api/build", tags=["build"])
 app.include_router(queue_router, prefix="/api/queue", tags=["queue"])
 app.include_router(inbox_router, prefix="/api/inbox", tags=["inbox"])
 app.include_router(media_stream_router, prefix="/api/blitz", tags=["media-stream"])
+app.include_router(call_friend_router, prefix="/api/call_friend", tags=["call-friend"])
 app.include_router(traces_router, prefix="/api", tags=["traces"])
 
 
@@ -287,6 +288,8 @@ async def api_root():
             "GET /api/inbox/stream/{session_id}": "Stream real-time inbox check updates",
             "GET /api/queue/session/{session_id}": "Get queue session status",
             "POST /api/queue/cancel/{session_id}": "Cancel a queue hold wait",
+            "GET /api/call_friend/stream/{session_id}": "Stream real-time call friend updates",
+            "GET /api/call_friend/session/{session_id}": "Get call friend session status",
             "GET /api/traces": "Traces dashboard (performance, improvement, recent)",
             "GET /api/traces/performance": "Aggregate performance metrics",
             "GET /api/traces/improvement": "Self-improvement data over time",
