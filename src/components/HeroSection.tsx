@@ -17,7 +17,7 @@ const HeroSection = () => {
     <section className="bg-background pt-16 pb-0">
       <div className="max-w-5xl mx-auto px-6 text-center">
         <h1 className="font-serif text-6xl md:text-7xl lg:text-8xl font-normal text-foreground leading-tight mb-6">
-          You say it.<br />It's sorted.
+          Agentic power.<br />For all of us.
         </h1>
         <p className="font-sans text-lg text-muted-foreground max-w-xl mx-auto mb-10">
           Friendly handles the annoying stuff for you — phone calls, quotes, bookings, cancellations. Just type what you need like texting a friend.
