@@ -40,7 +40,11 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Friendly API...")
     logger.info(f"Demo mode: {settings.demo_mode}")
+    logger.info(f"BACKEND_URL: {settings.backend_url}")
     logger.info(f"CORS origins: {settings.cors_origins_list}")
+    logger.info(f"Twilio configured: {bool(settings.twilio_account_sid)}")
+    logger.info(f"ElevenLabs configured: {bool(settings.elevenlabs_api_key)}")
+    logger.info(f"Google Places configured: {bool(settings.google_places_api_key)}")
 
     # Initialize W&B Weave if configured
     if settings.wandb_api_key:
@@ -117,6 +121,20 @@ async def root():
 async def health():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+@app.get("/debug/config")
+async def debug_config():
+    """Debug endpoint - show current configuration (no secrets)."""
+    return {
+        "demo_mode": settings.demo_mode,
+        "backend_url": settings.backend_url,
+        "twilio_configured": bool(settings.twilio_account_sid and settings.twilio_auth_token),
+        "twilio_phone": settings.twilio_phone_number[:6] + "***" if settings.twilio_phone_number else None,
+        "elevenlabs_configured": bool(settings.elevenlabs_api_key),
+        "google_places_configured": bool(settings.google_places_api_key),
+        "redis_url": settings.redis_url.split("@")[-1] if "@" in settings.redis_url else "localhost",
+    }
 
 
 @app.get("/api")
