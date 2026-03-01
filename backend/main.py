@@ -137,6 +137,18 @@ async def debug_config():
     }
 
 
+@app.get("/debug/places")
+async def debug_places(query: str, location: str):
+    """Debug endpoint - test places search directly."""
+    from services.places import search_businesses
+    businesses = await search_businesses(query=query, location=location, max_results=3)
+    return {
+        "query": query,
+        "location": location,
+        "results": [b.model_dump() for b in businesses],
+    }
+
+
 @app.get("/api")
 async def api_root():
     """API root - list available endpoints."""

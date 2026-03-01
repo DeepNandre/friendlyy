@@ -121,6 +121,8 @@ async def search_businesses(
     Returns:
         List of Business objects with phone numbers
     """
+    logger.info(f"[PLACES] Searching: query='{query}', location='{location}', lat_lng={lat_lng}")
+
     # Check for API key
     if not settings.google_places_api_key:
         logger.info("Google Places API key not set, using fallback")
@@ -157,11 +159,12 @@ async def _search_places_api(
     if location:
         search_query = f"{query} in {location}"
 
+    logger.info(f"[PLACES] Google API query: '{search_query}'")
+
     # Build params
     params: Dict[str, Any] = {
         "query": search_query,
         "key": settings.google_places_api_key,
-        "type": "establishment",
     }
 
     # Add location bias if provided
@@ -178,6 +181,7 @@ async def _search_places_api(
     search_data = search_response.json()
 
     places = search_data.get("results", [])
+    logger.info(f"[PLACES] Found {len(places)} raw results from Google")
     if not places:
         return []
 

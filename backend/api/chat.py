@@ -36,6 +36,9 @@ async def chat(
     logger.info(
         f"Classified as: {result.agent.value} (confidence: {result.confidence})"
     )
+    logger.info(
+        f"Router params: service='{result.params.service}', location='{result.params.location}', timeframe='{result.params.timeframe}'"
+    )
 
     # Route based on agent type
     if result.agent == AgentType.BLITZ:
