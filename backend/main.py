@@ -185,15 +185,38 @@ async def debug_call(phone: str):
 @app.post("/debug/twiml")
 @app.get("/debug/twiml")
 async def debug_twiml():
-    """Simple TwiML for test calls."""
+    """Simple TwiML for test calls - uses ElevenLabs."""
     from twilio.twiml.voice_response import VoiceResponse
     from fastapi.responses import Response
 
     response = VoiceResponse()
-    response.say("Hello! This is a test call from Friendly. The system is working correctly. Goodbye!", voice="Polly.Amy")
+    # Use ElevenLabs audio instead of robotic Twilio TTS
+    response.play(f"{settings.backend_url}/debug/tts")
     response.hangup()
 
     return Response(content=str(response), media_type="application/xml")
+
+
+@app.get("/debug/tts")
+async def debug_tts():
+    """Generate ElevenLabs audio for test call."""
+    from fastapi.responses import Response
+    from services.elevenlabs_voice import generate_tts_audio
+
+    text = "Hello! This is a test call from Friendly. I'm speaking with a natural voice powered by Eleven Labs. The system is working perfectly. Goodbye!"
+
+    audio = await generate_tts_audio(text)
+
+    if not audio:
+        # Fallback to empty audio if ElevenLabs fails
+        logger.error("ElevenLabs TTS failed for debug call")
+        return Response(content=b"", media_type="audio/mpeg")
+
+    return Response(
+        content=audio,
+        media_type="audio/mpeg",
+        headers={"Content-Disposition": "inline"},
+    )
 
 
 @app.post("/debug/call-status")
