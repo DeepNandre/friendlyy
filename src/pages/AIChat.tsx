@@ -647,7 +647,10 @@ export default function AIChat() {
                               {/* Build steps inside browser content */}
                               {message.buildSteps && message.buildSteps.length > 0 && (
                                 <div className="px-4 pt-3 pb-2 border-b border-border/50">
-                                  <Steps defaultOpen={!message.buildSteps.every(s => s.status === 'complete')}>
+                                  <Steps
+                                    key={`steps-${message.id}-${message.buildSteps.every(s => s.status === 'complete')}`}
+                                    defaultOpen={!message.buildSteps.every(s => s.status === 'complete')}
+                                  >
                                     <StepsTrigger
                                       leftIcon={
                                         message.buildSteps.every(s => s.status === 'complete')
