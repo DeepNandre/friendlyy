@@ -134,6 +134,14 @@ class ChatRequest(BaseModel):
         default=None,
         description="Previous messages for context",
     )
+    model: Optional[str] = Field(
+        default=None,
+        description="Model ID for chat (e.g. mixtral-8x7b)",
+    )
+    web_search: Optional[bool] = Field(
+        default=False,
+        description="Enable web search for responses (future use)",
+    )
 
     @field_validator("message")
     @classmethod

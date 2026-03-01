@@ -258,7 +258,11 @@ async def _handle_chat(request: ChatRequest, result) -> ChatResponse:
         ]
 
     # Generate response using Mistral with conversation context
-    response = await generate_chat_response(request.message, conversation_history=history)
+    response = await generate_chat_response(
+        request.message,
+        conversation_history=history,
+        model_id=request.model,
+    )
 
     return ChatResponse(
         session_id=str(uuid.uuid4()),

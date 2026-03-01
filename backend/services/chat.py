@@ -24,16 +24,17 @@ Your capabilities:
 - **Bid**: Negotiate bills down (coming soon)
 
 Personality:
-- Friendly, casual, and helpful
-- Concise responses (2-3 sentences max unless explaining something complex)
-- Use simple language, no jargon
-- Proactively suggest how you can help
+- Be warm, engaging, and conversational — like chatting with a knowledgeable friend
+- Give thoughtful, substantive answers. Expand when it helps; keep it tight when a quick reply fits
+- Remember context from the conversation and build on it. Reference what the user said earlier when relevant
+- Ask clarifying questions when their request is ambiguous
+- Use natural language. Avoid jargon unless the user does
+- Proactively offer helpful next steps or follow-ups when useful
 
-When users ask for services, quotes, or availability - guide them to use Blitz by saying something like "find me a plumber" or "get quotes from electricians".
+When users ask for services, quotes, or availability — guide them to Blitz (e.g. "find me a plumber", "get quotes from electricians").
+When users want to build something — guide them to VibeCoder.
 
-When users want to build something - guide them to VibeCoder.
-
-Do NOT make up information. If you don't know something, say so."""
+Do NOT make up information. If you don't know something, say so. Stay helpful and iterative throughout the conversation."""
 
 
 def _log_chat(*, result, duration, error, args, kwargs, ctx):
@@ -48,10 +49,21 @@ def _log_chat(*, result, duration, error, args, kwargs, ctx):
     )
 
 
+# Map frontend model IDs to NVIDIA NIM model names
+# See https://build.nvidia.com/nim for available models
+MODEL_MAP = {
+    "mistral-nemo": "mistralai/mixtral-8x7b-instruct-v0.1",
+    "mixtral-8x7b": "mistralai/mixtral-8x7b-instruct-v0.1",
+    "mistral-small": "mistralai/mixtral-8x7b-instruct-v0.1",
+    "devstral-small": "mistralai/mixtral-8x7b-instruct-v0.1",
+}
+
+
 @traced("generate_chat_response", log_fn=_log_chat)
 async def generate_chat_response(
     user_message: str,
     conversation_history: Optional[list] = None,
+    model_id: Optional[str] = None,
 ) -> str:
     """
     Generate a conversational response using Mistral.
@@ -59,6 +71,7 @@ async def generate_chat_response(
     Args:
         user_message: The user's message
         conversation_history: Optional previous messages for context
+        model_id: Frontend model ID (mistral-nemo, mixtral-8x7b, etc.)
 
     Returns:
         The AI's response text
@@ -68,33 +81,38 @@ async def generate_chat_response(
         logger.warning("NVIDIA_API_KEY not set, using fallback response")
         return _fallback_response(user_message)
 
+    # Resolve model - use Mistral API if available for some models, else NVIDIA NIM
+    api_url = NVIDIA_API_URL
+    headers = {
+        "Authorization": f"Bearer {settings.nvidia_api_key}",
+        "Content-Type": "application/json",
+    }
+    nim_model = MODEL_MAP.get(model_id or "mixtral-8x7b", "mistralai/mixtral-8x7b-instruct-v0.1")
+
     try:
         # Build messages
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-        # Add conversation history if provided
+        # Add conversation history - last 12 messages (6 exchanges) for richer context
         if conversation_history:
-            for msg in conversation_history[-6:]:  # Last 6 messages for context
-                messages.append({
-                    "role": msg.get("role", "user"),
-                    "content": msg.get("content", ""),
-                })
+            for msg in conversation_history[-12:]:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if content.strip():
+                    messages.append({"role": role, "content": content})
 
         # Add current message
         messages.append({"role": "user", "content": user_message})
 
         client = await get_http_client()
         response = await client.post(
-            NVIDIA_API_URL,
-            headers={
-                "Authorization": f"Bearer {settings.nvidia_api_key}",
-                "Content-Type": "application/json",
-            },
+            api_url,
+            headers=headers,
             json={
-                "model": "mistralai/mixtral-8x7b-instruct-v0.1",
+                "model": nim_model,
                 "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 500,
+                "temperature": 0.8,
+                "max_tokens": 1024,
             },
             timeout=30.0,
         )
