@@ -11,13 +11,23 @@ import {
   X,
   Clock,
   Loader2,
-  ChevronRight,
-  Zap,
   MessageSquare,
   ExternalLink,
+  Paperclip,
+  Mic,
 } from 'lucide-react';
 import { useBlitzStream, CallStatusType } from '../hooks/useBlitzStream';
 import { useBuildStream } from '../hooks/useBuildStream';
+import { Markdown } from '../components/ui/markdown';
+import { SourceList } from '../components/ui/source';
+import { Steps, StepsTrigger, StepsContent, StepsItem } from '../components/ui/steps';
+import {
+  PromptInput,
+  PromptInputTextarea,
+  PromptInputActions,
+  PromptInputAction,
+  PromptInputSubmit,
+} from '../components/ui/prompt-input';
 
 type MessageRole = 'user' | 'assistant';
 type AgentType = 'blitz' | 'build' | 'chat' | null;
@@ -37,6 +47,12 @@ interface BuildStep {
   status: 'pending' | 'in_progress' | 'complete' | 'error';
 }
 
+interface SourceInfo {
+  href: string;
+  title: string;
+  description?: string;
+}
+
 interface Message {
   id: string;
   role: MessageRole;
@@ -49,6 +65,7 @@ interface Message {
   thinkingTime?: number;
   previewUrl?: string;
   buildSteps?: BuildStep[];
+  sources?: SourceInfo[];
 }
 
 const BLITZ_API_BASE =
@@ -63,7 +80,6 @@ export default function AIChat() {
   const [activeBuildSessionId, setActiveBuildSessionId] = useState<string | null>(null);
   const [activeBuildMessageId, setActiveBuildMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const stream = useBlitzStream(activeSessionId);
   const buildStream = useBuildStream(activeBuildSessionId);
@@ -114,7 +130,7 @@ export default function AIChat() {
         if (buildStream.buildStatus === 'building') {
           content = buildStream.message || 'Building your site...';
         } else if (buildStream.buildStatus === 'complete') {
-          content = `${buildStream.message || 'Your site is ready!'}\n\n[View Preview](${buildStream.previewUrl})`;
+          content = buildStream.message || 'Your site is ready!';
         } else if (buildStream.buildStatus === 'clarification') {
           content = buildStream.clarification || 'Could you tell me more about what you want to build?';
         } else if (buildStream.buildStatus === 'error') {
@@ -193,6 +209,7 @@ export default function AIChat() {
             isThinking: false,
             thinkingTime: 2,
             callStatuses: data.agent === 'blitz' ? [] : undefined,
+            sources: data.sources || undefined,
           }
         )
       );
@@ -285,7 +302,7 @@ export default function AIChat() {
                 {[
                   { icon: <Phone size={13} />, label: 'Find a plumber', value: 'Find me a plumber who can come tomorrow' },
                   { icon: <Code size={13} />, label: 'Build a landing page', value: 'Build me a landing page for my startup' },
-                  { icon: <Zap size={13} />, label: 'Get electrician quotes', value: 'Get quotes from 3 electricians in London' },
+                  { icon: <Sparkles size={13} />, label: 'Get electrician quotes', value: 'Get quotes from 3 electricians in London' },
                 ].map((action) => (
                   <button
                     key={action.label}
@@ -335,7 +352,14 @@ export default function AIChat() {
                             Thought for {message.thinkingTime}s
                           </div>
                         )}
-                        <p className="text-[15px] text-foreground leading-relaxed font-sans">{message.content}</p>
+
+                        {/* Markdown rendered content */}
+                        <Markdown className="text-foreground">{message.content}</Markdown>
+
+                        {/* Source citations */}
+                        {message.sources && message.sources.length > 0 && (
+                          <SourceList sources={message.sources} />
+                        )}
 
                         {/* Blitz Call Widget - macOS FaceTime Style */}
                         {message.agent === 'blitz' && message.callStatuses && message.callStatuses.length > 0 && (() => {
@@ -366,7 +390,7 @@ export default function AIChat() {
                                   const isSuccess = call.status === 'complete' && call.result;
                                   const isBestOption = idx === firstSuccessIdx;
                                   const isFailed = call.status === 'failed' || call.status === 'no_answer' || call.status === 'busy';
-                                  const isLast = idx === message.callStatuses.length - 1;
+                                  const isLast = idx === message.callStatuses!.length - 1;
 
                                   return (
                                     <div key={idx} className={`flex justify-between items-start px-4 py-4 ${!isLast ? 'border-b border-gray-200/80' : ''}`}>
@@ -435,7 +459,7 @@ export default function AIChat() {
                           );
                         })()}
 
-                        {/* VibeCoder Widget */}
+                        {/* VibeCoder Widget with Steps component */}
                         {message.agent === 'build' && (
                           <div className="border border-border rounded-2xl bg-card overflow-hidden mt-3 shadow-sm">
                             <div className="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-violet-500/10 to-purple-500/10 border-b border-border">
@@ -457,25 +481,29 @@ export default function AIChat() {
                               )}
                             </div>
 
-                            {/* Build Steps */}
+                            {/* Build Steps using Steps component */}
                             {message.buildSteps && message.buildSteps.length > 0 && (
-                              <div className="px-4 py-3 space-y-2">
-                                {message.buildSteps.map((step) => (
-                                  <div key={step.id} className="flex items-center gap-2">
-                                    {step.status === 'complete' ? (
-                                      <Check size={14} className="text-green-500" />
-                                    ) : step.status === 'in_progress' ? (
-                                      <Loader2 size={14} className="text-violet-500 animate-spin" />
-                                    ) : step.status === 'error' ? (
-                                      <X size={14} className="text-red-500" />
-                                    ) : (
-                                      <Clock size={14} className="text-muted-foreground" />
-                                    )}
-                                    <span className={`text-sm font-sans ${step.status === 'complete' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                      {step.label}
-                                    </span>
-                                  </div>
-                                ))}
+                              <div className="px-4 py-3">
+                                <Steps defaultOpen={true}>
+                                  <StepsTrigger
+                                    leftIcon={
+                                      message.buildSteps.every(s => s.status === 'complete')
+                                        ? <Check size={14} className="text-green-500" />
+                                        : <Loader2 size={14} className="text-violet-500 animate-spin" />
+                                    }
+                                  >
+                                    {message.buildSteps.every(s => s.status === 'complete')
+                                      ? 'Build complete'
+                                      : 'Building...'}
+                                  </StepsTrigger>
+                                  <StepsContent showBar={true}>
+                                    {message.buildSteps.map((step) => (
+                                      <StepsItem key={step.id} status={step.status}>
+                                        {step.label}
+                                      </StepsItem>
+                                    ))}
+                                  </StepsContent>
+                                </Steps>
                               </div>
                             )}
 
@@ -518,28 +546,36 @@ export default function AIChat() {
           <div className="h-28 shrink-0" />
         </div>
 
-        {/* Floating Input */}
+        {/* Floating Input - Using PromptInput component */}
         <div className="sticky bottom-0 bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-5 px-8 md:px-20 lg:px-36">
           <div className="max-w-2xl mx-auto">
-            <div className="bg-card border border-border rounded-2xl shadow-lg shadow-foreground/8 flex items-center p-2 gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            <PromptInput
+              value={input}
+              onValueChange={setInput}
+              isLoading={isLoading}
+              onSubmit={handleSend}
+              maxHeight={200}
+            >
+              <PromptInputTextarea
                 placeholder="Ask me anything... Find services, build apps, get quotes"
-                className="flex-1 outline-none text-sm text-foreground placeholder-muted-foreground bg-transparent min-w-0 py-2 pl-3 font-sans"
-                disabled={isLoading}
               />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || isLoading}
-                className="bg-foreground hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed text-background rounded-xl w-9 h-9 flex items-center justify-center shrink-0 transition-all"
-              >
-                {isLoading ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
-              </button>
-            </div>
+              <PromptInputActions>
+                <PromptInputAction tooltip="Attach file" side="top">
+                  <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
+                    <Paperclip size={16} />
+                  </button>
+                </PromptInputAction>
+                <PromptInputAction tooltip="Voice input" side="top">
+                  <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
+                    <Mic size={16} />
+                  </button>
+                </PromptInputAction>
+                <PromptInputSubmit
+                  icon={<ArrowRight size={16} />}
+                  loadingIcon={<Loader2 size={16} className="animate-spin" />}
+                />
+              </PromptInputActions>
+            </PromptInput>
             <p className="text-center text-[11px] text-muted-foreground mt-2 font-sans">
               Friendly AI can make mistakes. Verify important information.
             </p>
