@@ -29,7 +29,7 @@ const Navbar = () => {
         {/* CTA */}
         <div className="hidden md:flex items-center gap-3">
           <a
-            href="/dashboard"
+            href="/ai"
             className="px-5 py-2 rounded-full border-2 border-foreground bg-transparent text-sm font-semibold font-sans hover:bg-foreground hover:text-background transition-colors"
           >
             GET STARTED
@@ -52,7 +52,7 @@ const Navbar = () => {
           <a href="#" className="text-sm font-sans">Solutions</a>
           <a href="#" className="text-sm font-sans">Pricing</a>
           <a href="#" className="text-sm font-sans">Login</a>
-          <a href="/dashboard" className="px-5 py-2 rounded-full border-2 border-foreground text-sm font-semibold font-sans text-center">GET STARTED</a>
+          <a href="/ai" className="px-5 py-2 rounded-full border-2 border-foreground text-sm font-semibold font-sans text-center">GET STARTED</a>
         </div>
       )}
     </nav>
