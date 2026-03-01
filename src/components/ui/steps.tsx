@@ -24,7 +24,7 @@ export const StepsItem = ({
       case "complete":
         return <Check size={14} className="text-green-500" />
       case "in_progress":
-        return <Loader2 size={14} className="text-violet-500 animate-spin" />
+        return <Loader2 size={14} className="text-muted-foreground animate-spin" />
       case "error":
         return <Circle size={14} className="text-red-500 fill-red-500" />
       default:
