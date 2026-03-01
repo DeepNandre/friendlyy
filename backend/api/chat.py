@@ -246,8 +246,16 @@ async def _handle_chat(request: ChatRequest, result) -> ChatResponse:
     """Handle general chat requests using Mistral."""
     import uuid
 
-    # Generate response using Mistral
-    response = await generate_chat_response(request.message)
+    # Convert conversation history to format expected by chat service
+    history = None
+    if request.conversation_history:
+        history = [
+            {"role": msg.role, "content": msg.content}
+            for msg in request.conversation_history
+        ]
+
+    # Generate response using Mistral with conversation context
+    response = await generate_chat_response(request.message, conversation_history=history)
 
     return ChatResponse(
         session_id=str(uuid.uuid4()),

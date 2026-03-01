@@ -1,11 +1,16 @@
+import { Link } from 'react-router-dom';
 import { Home, Phone, Code, Settings, MessageSquare } from 'lucide-react';
 
 export default function ChatSidebar() {
   return (
     <aside className="hidden md:flex w-16 border-r border-border flex-col items-center py-6 gap-5 bg-background shrink-0">
-      <div className="w-9 h-9 rounded-2xl bg-background flex items-center justify-center p-1.5 shadow-lg border border-border overflow-hidden">
+      <Link
+        to="/"
+        className="w-9 h-9 rounded-2xl bg-background flex items-center justify-center p-1.5 shadow-lg border border-border overflow-hidden hover:bg-muted/50 transition-colors block"
+        aria-label="Go to home"
+      >
         <img src="/friendly-logo-monochrome.jpg" alt="Friendly" className="w-full h-full object-contain" />
-      </div>
+      </Link>
       <div className="flex flex-col gap-1 mt-2">
         <button className="p-2.5 hover:bg-muted rounded-xl transition-colors text-muted-foreground hover:text-foreground">
           <Home size={17} />

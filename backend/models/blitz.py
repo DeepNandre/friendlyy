@@ -110,6 +110,12 @@ class BlitzSession(BaseModel):
 # ==================== API MODELS ====================
 
 
+class ChatMessage(BaseModel):
+    """A single message in conversation history."""
+    role: Literal["user", "assistant"] = "user"
+    content: str
+
+
 class ChatRequest(BaseModel):
     """Request body for POST /api/chat."""
 
@@ -123,6 +129,10 @@ class ChatRequest(BaseModel):
     location: Optional[Dict[str, float]] = Field(
         default=None,
         description="User location as {lat: float, lng: float}",
+    )
+    conversation_history: Optional[List[ChatMessage]] = Field(
+        default=None,
+        description="Previous messages for context",
     )
 
     @field_validator("message")
