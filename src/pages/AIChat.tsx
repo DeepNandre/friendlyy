@@ -44,6 +44,7 @@ import {
   generateSessionTitle,
   getSessionType,
 } from '../components/ui/chat-history';
+import { cn } from '@/lib/utils';
 
 type MessageRole = 'user' | 'assistant';
 type AgentType = 'blitz' | 'build' | 'chat' | 'inbox' | null;
@@ -178,8 +179,14 @@ export default function AIChat() {
     setActiveTab('builds');
   };
 
+  const prevMessagesLengthRef = useRef(0);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Only auto-scroll when a NEW message is added — not on every build/progress update.
+    // Prevents being stuck when build stream frequently updates the same message.
+    if (messages.length > prevMessagesLengthRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevMessagesLengthRef.current = messages.length;
   }, [messages]);
 
   useEffect(() => {
@@ -458,7 +465,7 @@ export default function AIChat() {
       />
 
       {/* Chat Area */}
-      <main className="flex-1 overflow-y-auto flex flex-col relative">
+      <main className="flex-1 min-h-0 overflow-y-auto flex flex-col relative">
         <div className="flex-1 px-8 md:px-20 lg:px-36 py-12 flex flex-col">
 
           {/* Welcome State */}
@@ -640,7 +647,7 @@ export default function AIChat() {
                               {/* Build steps inside browser content */}
                               {message.buildSteps && message.buildSteps.length > 0 && (
                                 <div className="px-4 pt-3 pb-2 border-b border-border/50">
-                                  <Steps defaultOpen={true}>
+                                  <Steps defaultOpen={!message.buildSteps.every(s => s.status === 'complete')}>
                                     <StepsTrigger
                                       leftIcon={
                                         message.buildSteps.every(s => s.status === 'complete')
@@ -667,7 +674,12 @@ export default function AIChat() {
                                 <>
                                   <iframe
                                     src={message.previewUrl}
-                                    className="w-full h-64 bg-white"
+                                    className={cn(
+                                      "w-full bg-white",
+                                      message.buildSteps?.every(s => s.status === 'complete')
+                                        ? "h-80"
+                                        : "h-64"
+                                    )}
                                     title="Website Preview"
                                   />
                                   <div className="flex justify-center p-3 border-t border-border/50 bg-muted/20">
