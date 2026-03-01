@@ -40,7 +40,7 @@ class Settings(BaseSettings):
 
     # App
     backend_url: str = "http://localhost:8000"
-    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    cors_origins: str = "http://localhost:5173,http://localhost:3000,https://friendlyy-frontend-production.up.railway.app"
     demo_mode: bool = False
 
     # Rate limiting

@@ -709,7 +709,7 @@ export default function AIChat() {
                         {/* Inbox Preview Card */}
                         {message.agent === 'inbox' && (
                           <InboxPreviewCard
-                            status={message.inboxStatus || 'checking'}
+                            status={(message.inboxStatus ?? 'checking') as 'checking' | 'auth_required' | 'fetching' | 'summarizing' | 'complete' | 'error'}
                             summary={message.inboxSummary}
                             authUrl={message.inboxAuthUrl}
                             error={message.inboxStatus === 'error' ? message.content : undefined}
@@ -758,7 +758,7 @@ export default function AIChat() {
                 </PromptInputChips>
                 <PromptInputActions>
                   <PromptInputAction tooltip="Attach file" side="top">
-                    <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
+                    <button className="w-8 h-8 flex items-center justify-center hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
                       <Paperclip size={18} />
                     </button>
                   </PromptInputAction>

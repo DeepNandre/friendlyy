@@ -131,6 +131,7 @@ async def debug_config():
     return {
         "demo_mode": settings.demo_mode,
         "backend_url": settings.backend_url,
+        "cors_origins": settings.cors_origins_list,
         "twilio_configured": bool(settings.twilio_account_sid and settings.twilio_auth_token),
         "twilio_phone": settings.twilio_phone_number[:6] + "***" if settings.twilio_phone_number else None,
         "elevenlabs_configured": bool(settings.elevenlabs_api_key),

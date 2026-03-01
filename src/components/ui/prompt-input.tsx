@@ -143,7 +143,7 @@ export function PromptInputChips({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 px-3 pb-3 flex-wrap",
+        "flex items-center gap-2 px-3 pb-3 flex-wrap min-h-8",
         className
       )}
       {...props}
@@ -171,7 +171,7 @@ export function PromptInputChip({
   return (
     <button
       className={cn(
-        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all",
+        "flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm transition-all shrink-0",
         active
           ? "bg-accent text-accent-foreground"
           : "text-muted-foreground hover:text-foreground hover:bg-muted",
@@ -195,7 +195,7 @@ export function PromptInputActions({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 ml-auto",
+        "flex items-center gap-1 ml-auto min-h-8",
         className
       )}
       {...props}
@@ -267,7 +267,7 @@ export function PromptInputSubmit({
       onClick={onSubmit}
       disabled={disabled || !hasValue}
       className={cn(
-        "rounded-xl w-10 h-10 flex items-center justify-center shrink-0 transition-all",
+        "rounded-xl w-8 h-8 flex items-center justify-center shrink-0 transition-all",
         hasValue && !disabled
           ? "bg-orange-100 text-orange-600 hover:bg-orange-200"
           : "text-muted-foreground/50 cursor-not-allowed",
@@ -290,7 +290,7 @@ export function PromptInputBottomBar({
   return (
     <div
       className={cn(
-        "flex items-center justify-between px-3 pb-3",
+        "flex items-center justify-between gap-3 px-3 pb-3 min-h-8",
         className
       )}
       {...props}

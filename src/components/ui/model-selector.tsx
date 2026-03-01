@@ -82,7 +82,7 @@ export function ModelSelectorDropdown({
           variant="ghost"
           size="sm"
           className={cn(
-            "h-8 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground font-medium",
+            "h-8 min-w-0 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground font-medium shrink-0",
             className
           )}
         >
