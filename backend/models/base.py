@@ -13,6 +13,7 @@ class AgentType(str, Enum):
     QUEUE = "queue"  # Wait on hold for someone
     BID = "bid"  # Negotiate bills lower
     BUILD = "build"  # Build websites, apps, landing pages
+    INBOX = "inbox"  # Check email inbox
     CHAT = "chat"  # General conversation
 
 

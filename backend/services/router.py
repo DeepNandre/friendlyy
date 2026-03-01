@@ -7,19 +7,17 @@ import json
 import logging
 from typing import Optional
 
-from core import get_http_client, settings
+from core import settings
+from core.mistral import call_mistral, MistralError
 from models import AgentType, RouterParams, RouterResult
 from services.weave_tracing import traced, log_router_classification
 
 logger = logging.getLogger(__name__)
 
-# NVIDIA NIM endpoint for Mixtral 8x7B
-NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
-
 ROUTER_SYSTEM_PROMPT = """You are a router for Friendly, an AI assistant that makes phone calls on behalf of users.
 
 Classify the user's intent and output ONLY valid JSON:
-{"agent": "blitz|build|bounce|queue|bid|chat", "params": {...}, "confidence": 0.0-1.0}
+{"agent": "blitz|build|bounce|queue|bid|inbox|chat", "params": {...}, "confidence": 0.0-1.0}
 
 Agents:
 - blitz: Find services, get quotes, check availability. ANY request to find, locate, search for, or get quotes from a service provider is blitz. This includes plumbers, electricians, cleaners, locksmiths, restaurants, dentists, mechanics, movers, tutors, painters, gardeners, and ANY other service.
@@ -27,7 +25,8 @@ Agents:
 - bounce: Cancel subscriptions (Netflix, gym, etc.)
 - queue: Wait on hold for someone (HMRC, bank, etc.)
 - bid: Negotiate bills lower (Sky, broadband, etc.)
-- chat: ONLY for greetings, help questions, or messages that don't involve finding/calling any service
+- inbox: Check email, read inbox, email summaries, mail updates. NOT for sending emails or "email me a quote" (those are blitz/chat).
+- chat: ONLY for greetings, help questions, or messages that don't involve finding/calling any service or checking email
 
 IMPORTANT: If the user mentions ANY service they want to find, get quotes from, or check availability for, classify as blitz. When in doubt between blitz and chat, choose blitz.
 
@@ -91,6 +90,21 @@ User: "call HMRC and wait on hold for me"
 User: "negotiate my Sky bill down"
 {"agent": "bid", "params": {"service": "Sky", "action": "negotiate"}, "confidence": 0.95}
 
+User: "check my email"
+{"agent": "inbox", "params": {"action": "check"}, "confidence": 0.95}
+
+User: "any important emails today?"
+{"agent": "inbox", "params": {"action": "check", "timeframe": "today"}, "confidence": 0.95}
+
+User: "what's in my inbox?"
+{"agent": "inbox", "params": {"action": "check"}, "confidence": 0.90}
+
+User: "do I have any new mail?"
+{"agent": "inbox", "params": {"action": "check"}, "confidence": 0.90}
+
+User: "summarize my emails from this morning"
+{"agent": "inbox", "params": {"action": "check", "timeframe": "this morning"}, "confidence": 0.95}
+
 User: "hello"
 {"agent": "chat", "params": {"type": "greeting"}, "confidence": 1.0}
 
@@ -136,39 +150,16 @@ async def classify_intent(user_message: str) -> RouterResult:
     Returns:
         RouterResult with agent type, params, and confidence
     """
-    # Check for API key
-    if not settings.nvidia_api_key:
-        logger.warning("NVIDIA_API_KEY not set, falling back to chat")
-        return RouterResult(
-            agent=AgentType.CHAT,
-            params=RouterParams(),
-            confidence=0.5,
-        )
-
     try:
-        client = await get_http_client()
-        response = await client.post(
-            NVIDIA_API_URL,
-            headers={
-                "Authorization": f"Bearer {settings.nvidia_api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "mistralai/mixtral-8x7b-instruct-v0.1",
-                "messages": [
-                    {"role": "system", "content": ROUTER_SYSTEM_PROMPT},
-                    {"role": "user", "content": user_message},
-                ],
-                "temperature": 0.1,  # Low temperature for consistency
-                "max_tokens": 200,
-            },
+        content = await call_mistral(
+            messages=[
+                {"role": "system", "content": ROUTER_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0.1,
+            max_tokens=200,
         )
 
-        response.raise_for_status()
-        result = response.json()
-        content = result["choices"][0]["message"]["content"].strip()
-
-        # Parse JSON response
         parsed = _parse_router_response(content)
         logger.info(
             f"Router classified '{user_message[:50]}...' as {parsed.agent.value}"
