@@ -100,9 +100,11 @@ async def _check_gmail_connection(entity_id: str) -> tuple[bool, Optional[str]]:
         try:
             connection = entity.get_connection(app="gmail")
             if connection and connection.status == "ACTIVE":
+                logger.info(f"Gmail connected for entity {entity_id}")
                 return True, None
-        except Exception:
-            pass
+            logger.info(f"Gmail connection status: {connection.status if connection else 'None'}")
+        except Exception as e:
+            logger.info(f"No Gmail connection for entity {entity_id}: {e}")
 
         settings = get_settings()
         auth_response = entity.initiate_connection(
@@ -118,24 +120,33 @@ async def _fetch_emails(entity_id: str) -> List[Dict[str, Any]]:
     """
     Fetch recent important/unread emails via Composio Gmail tools.
 
-    Uses GMAIL_FETCH_EMAILS with query:
-    newer_than:1d (is:important OR is:unread OR category:primary)
+    Uses GMAIL_FETCH_EMAILS with query for unread/important emails.
     """
     def _sync_fetch():
         toolset = _get_composio_toolset()
-        entity = toolset.get_entity(id=entity_id)
 
-        result = entity.execute_action(
+        result = toolset.execute_action(
             action="GMAIL_FETCH_EMAILS",
             params={
-                "query": "newer_than:1d (is:important OR is:unread OR category:primary)",
+                "query": "is:unread OR is:important",
                 "max_results": 20,
             },
+            entity_id=entity_id,
         )
 
-        emails = result.get("data", {}).get("messages", [])
+        # Extract messages — response shape can vary
+        emails = []
+        if isinstance(result, dict):
+            emails = result.get("data", {}).get("messages", [])
+            if not emails:
+                emails = result.get("messages", [])
+            if not emails:
+                # Try top-level response data
+                data = result.get("data", result)
+                if isinstance(data, list):
+                    emails = data
 
-        # Normalize — Composio response shapes can vary
+        # Normalize
         normalized = []
         for email in emails:
             normalized.append({
