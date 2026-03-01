@@ -37,7 +37,10 @@ async def chat(
     # Classify intent
     result = await classify_intent(request.message)
     logger.info(
-        f"Classified as: {result.agent.value} (confidence: {result.confidence})"
+        f"=== ROUTER DECISION === Agent: {result.agent.value}, Confidence: {result.confidence}"
+    )
+    logger.info(
+        f"=== ROUTER PARAMS === service: '{result.params.service}', action: '{result.params.action}', notes: '{result.params.notes}'"
     )
     logger.info(
         f"Router params: service='{result.params.service}', location='{result.params.location}', timeframe='{result.params.timeframe}'"
@@ -77,20 +80,28 @@ async def chat(
 
     # Route based on agent type
     if result.agent == AgentType.BLITZ:
+        logger.info("=== ROUTING TO: BLITZ ===")
         return await _handle_blitz(request, result, background_tasks)
     elif result.agent == AgentType.BUILD:
+        logger.info("=== ROUTING TO: BUILD ===")
         return await _handle_build(request, result, background_tasks)
     elif result.agent == AgentType.BOUNCE:
+        logger.info("=== ROUTING TO: BOUNCE ===")
         return _handle_not_implemented("bounce", result)
     elif result.agent == AgentType.QUEUE:
+        logger.info("=== ROUTING TO: QUEUE ===")
         return await _handle_queue(request, result, background_tasks)
     elif result.agent == AgentType.INBOX:
+        logger.info("=== ROUTING TO: INBOX ===")
         return await _handle_inbox(request, result, background_tasks)
     elif result.agent == AgentType.CALL_FRIEND:
+        logger.info("=== ROUTING TO: CALL_FRIEND ===")
         return await _handle_call_friend(request, result, background_tasks)
     elif result.agent == AgentType.BID:
+        logger.info("=== ROUTING TO: BID ===")
         return _handle_not_implemented("bid", result)
     else:
+        logger.info(f"=== ROUTING TO: CHAT (fallback, agent was {result.agent}) ===")
         return await _handle_chat(request, result)
 
 
