@@ -200,37 +200,65 @@ async def debug_twiml():
 
 @app.get("/debug/tts")
 async def debug_tts():
-    """Generate ElevenLabs audio for test call."""
+    """Generate ElevenLabs audio for test call - with full error details."""
     from fastapi.responses import Response, JSONResponse
-    from services.elevenlabs_voice import generate_tts_audio
+    from core import get_http_client
 
-    text = "Hello! This is a test call from Friendly. I'm speaking with a natural voice powered by Eleven Labs. The system is working perfectly. Goodbye!"
+    text = "Hello! This is a test call from Friendly."
 
-    logger.info(f"[DEBUG TTS] Generating audio for: {text[:50]}...")
+    # Call ElevenLabs API directly to get full error
+    try:
+        client = await get_http_client()
 
-    audio = await generate_tts_audio(text, use_cache=False)  # Disable cache for testing
+        voice_id = "21m00Tcm4TlvDq8ikWAM"  # Rachel
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 
-    if not audio:
-        logger.error("[DEBUG TTS] ElevenLabs returned no audio!")
+        headers = {
+            "xi-api-key": settings.elevenlabs_api_key,
+            "Content-Type": "application/json",
+            "Accept": "audio/mpeg",
+        }
+
+        payload = {
+            "text": text,
+            "model_id": "eleven_multilingual_v2",
+            "output_format": "mp3_22050_32",
+        }
+
+        logger.info(f"[DEBUG TTS] Calling ElevenLabs: {url}")
+        response = await client.post(url, headers=headers, json=payload, timeout=30.0)
+
+        if response.status_code != 200:
+            error_detail = response.text[:1000]
+            logger.error(f"[DEBUG TTS] ElevenLabs error {response.status_code}: {error_detail}")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "ElevenLabs API error",
+                    "status_code": response.status_code,
+                    "detail": error_detail,
+                    "api_key_prefix": settings.elevenlabs_api_key[:10] + "..." if settings.elevenlabs_api_key else None,
+                },
+            )
+
+        audio_data = response.content
+        logger.info(f"[DEBUG TTS] Success! {len(audio_data)} bytes")
+
+        return Response(
+            content=audio_data,
+            media_type="audio/mpeg",
+            headers={"Content-Length": str(len(audio_data))},
+        )
+
+    except Exception as e:
+        logger.error(f"[DEBUG TTS] Exception: {type(e).__name__}: {e}")
         return JSONResponse(
             status_code=500,
             content={
-                "error": "ElevenLabs TTS failed",
-                "elevenlabs_configured": bool(settings.elevenlabs_api_key),
-                "api_key_prefix": settings.elevenlabs_api_key[:10] + "..." if settings.elevenlabs_api_key else None,
+                "error": str(e),
+                "type": type(e).__name__,
             },
         )
-
-    logger.info(f"[DEBUG TTS] Success! Returning {len(audio)} bytes of audio")
-
-    return Response(
-        content=audio,
-        media_type="audio/mpeg",
-        headers={
-            "Content-Disposition": "inline",
-            "Content-Length": str(len(audio)),
-        },
-    )
 
 
 @app.post("/debug/call-status")
