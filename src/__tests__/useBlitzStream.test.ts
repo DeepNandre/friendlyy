@@ -387,4 +387,54 @@ describe('useBlitzStream', () => {
     // Status should remain pending since nothing matched
     expect(result.current.callStatuses[0].status).toBe('pending');
   });
+
+  it('includes latitude and longitude from business data', () => {
+    const { result } = renderHook(() => useBlitzStream('test-session'));
+
+    act(() => {
+      MockEventSource.latest().simulateEvent('session_start', {
+        status: 'calling',
+        businesses: [
+          {
+            name: 'Plumber A',
+            phone: '111-111',
+            address: '123 Main St',
+            latitude: 51.5074,
+            longitude: -0.1278,
+          },
+          {
+            name: 'Plumber B',
+            phone: '222-222',
+            latitude: 51.5155,
+            longitude: -0.1419,
+          },
+        ],
+      });
+    });
+
+    expect(result.current.callStatuses[0].latitude).toBe(51.5074);
+    expect(result.current.callStatuses[0].longitude).toBe(-0.1278);
+    expect(result.current.callStatuses[1].latitude).toBe(51.5155);
+    expect(result.current.callStatuses[1].longitude).toBe(-0.1419);
+  });
+
+  it('handles businesses without coordinates', () => {
+    const { result } = renderHook(() => useBlitzStream('test-session'));
+
+    act(() => {
+      MockEventSource.latest().simulateEvent('session_start', {
+        status: 'calling',
+        businesses: [
+          {
+            name: 'Plumber A',
+            phone: '111-111',
+            // No latitude/longitude
+          },
+        ],
+      });
+    });
+
+    expect(result.current.callStatuses[0].latitude).toBeUndefined();
+    expect(result.current.callStatuses[0].longitude).toBeUndefined();
+  });
 });

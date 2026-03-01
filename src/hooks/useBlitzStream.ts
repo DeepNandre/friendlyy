@@ -21,6 +21,8 @@ export interface CallStatus {
   phone?: string;
   address?: string;
   rating?: number;
+  latitude?: number;
+  longitude?: number;
   status: CallStatusType;
   result?: string;
   error?: string;
@@ -37,7 +39,7 @@ export interface BlitzStreamState {
   isConnected: boolean;
   sessionStatus: "idle" | "searching" | "calling" | "complete" | "error";
   callStatuses: CallStatus[];
-  businesses: Array<{ name: string; phone: string; address?: string; rating?: number }>;
+  businesses: Array<{ name: string; phone: string; address?: string; rating?: number; latitude?: number; longitude?: number }>;
   transcripts: TranscriptEntry[];
   summary: string | null;
   error: string | null;
@@ -71,6 +73,8 @@ function mapBusinessesToCallStatuses(businesses: any[]): CallStatus[] {
     phone: b.phone,
     address: b.address,
     rating: b.rating,
+    latitude: b.latitude,
+    longitude: b.longitude,
     status: "pending" as CallStatusType,
   }));
 }

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense, lazy } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Home,
@@ -46,6 +46,9 @@ import {
 } from '../components/ui/chat-history';
 import { cn } from '@/lib/utils';
 
+// Lazy load map component to reduce initial bundle size (Issue 13A)
+const BlitzMapCard = lazy(() => import('@/components/map/BlitzMapCard').then(m => ({ default: m.BlitzMapCard })));
+
 type MessageRole = 'user' | 'assistant';
 type AgentType = 'blitz' | 'build' | 'chat' | 'inbox' | null;
 
@@ -53,6 +56,8 @@ interface CallStatus {
   business: string;
   phone?: string;
   address?: string;
+  latitude?: number;
+  longitude?: number;
   status: 'pending' | 'ringing' | 'connected' | 'complete' | 'failed' | 'no_answer' | 'busy';
   result?: string;
   error?: string;
@@ -197,6 +202,8 @@ export default function AIChat() {
       business: cs.business,
       phone: cs.phone,
       address: cs.address,
+      latitude: cs.latitude,
+      longitude: cs.longitude,
       status: mapCallStatus(cs.status),
       result: cs.result,
       error: cs.error,
@@ -547,6 +554,31 @@ export default function AIChat() {
                         {/* Source citations */}
                         {message.sources && message.sources.length > 0 && (
                           <SourceList sources={message.sources} />
+                        )}
+
+                        {/* Blitz Map Card - Shows business locations on map */}
+                        {message.agent === 'blitz' && message.callStatuses && message.callStatuses.length > 0 && (
+                          <div className="w-full max-w-3xl mx-auto mt-3">
+                            <Suspense fallback={
+                              <div className="w-full h-[250px] rounded-xl bg-gray-800 animate-pulse flex items-center justify-center">
+                                <span className="text-gray-400 text-sm">Loading map...</span>
+                              </div>
+                            }>
+                              <BlitzMapCard
+                                callStatuses={message.callStatuses.map(cs => ({
+                                  business: cs.business,
+                                  phone: cs.phone,
+                                  address: cs.address,
+                                  rating: undefined,
+                                  latitude: cs.latitude,
+                                  longitude: cs.longitude,
+                                  status: cs.status as any,
+                                  result: cs.result,
+                                  error: cs.error,
+                                }))}
+                              />
+                            </Suspense>
+                          </div>
                         )}
 
                         {/* Blitz Call Widget - macOS FaceTime Style */}

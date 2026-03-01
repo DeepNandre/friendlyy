@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 PLACES_API_URL = "https://maps.googleapis.com/maps/api/place"
 
-# Fallback UK businesses for demo reliability
+# Fallback UK businesses for demo reliability (with coordinates for map display)
 FALLBACK_BUSINESSES: Dict[str, List[Business]] = {
     "plumber": [
         Business(
@@ -24,6 +24,8 @@ FALLBACK_BUSINESSES: Dict[str, List[Business]] = {
             phone="+442078331111",
             address="1 Sail Street, London SE11 6NQ",
             rating=4.5,
+            latitude=51.4875,
+            longitude=-0.1087,
         ),
         Business(
             id="fallback_plumber_2",
@@ -31,6 +33,8 @@ FALLBACK_BUSINESSES: Dict[str, List[Business]] = {
             phone="+442072230987",
             address="15 High Street, London EC1V 9JX",
             rating=4.3,
+            latitude=51.5246,
+            longitude=-0.0952,
         ),
         Business(
             id="fallback_plumber_3",
@@ -38,6 +42,8 @@ FALLBACK_BUSINESSES: Dict[str, List[Business]] = {
             phone="+443301238888",
             address="Cable Drive, Walsall WS2 7BN",
             rating=4.1,
+            latitude=52.5860,
+            longitude=-1.9826,
         ),
     ],
     "electrician": [
@@ -47,6 +53,8 @@ FALLBACK_BUSINESSES: Dict[str, List[Business]] = {
             phone="+442071234567",
             address="10 Electric Avenue, London SW9 8LA",
             rating=4.6,
+            latitude=51.4613,
+            longitude=-0.1156,
         ),
         Business(
             id="fallback_electrician_2",
@@ -54,6 +62,8 @@ FALLBACK_BUSINESSES: Dict[str, List[Business]] = {
             phone="+442089876543",
             address="25 Power Street, London NW1 8XY",
             rating=4.4,
+            latitude=51.5362,
+            longitude=-0.1426,
         ),
     ],
     "locksmith": [
@@ -63,6 +73,8 @@ FALLBACK_BUSINESSES: Dict[str, List[Business]] = {
             phone="+442074561234",
             address="Lock Lane, London W1 2AB",
             rating=4.7,
+            latitude=51.5155,
+            longitude=-0.1419,
         ),
     ],
     "default": [
@@ -72,6 +84,8 @@ FALLBACK_BUSINESSES: Dict[str, List[Business]] = {
             phone="+15005550006",  # Twilio test number (always answers)
             address="123 Demo Street, London",
             rating=4.5,
+            latitude=51.5074,
+            longitude=-0.1278,
         ),
         Business(
             id="fallback_default_2",
@@ -79,6 +93,8 @@ FALLBACK_BUSINESSES: Dict[str, List[Business]] = {
             phone="+15005550006",
             address="456 Test Road, London",
             rating=4.3,
+            latitude=51.5124,
+            longitude=-0.1231,
         ),
     ],
 }
@@ -205,6 +221,10 @@ async def _search_places_api(
             continue
 
         if details and details.get("phone"):
+            # Only include businesses with valid coordinates (per Issue 8C)
+            lat = details.get("latitude")
+            lng = details.get("longitude")
+
             businesses.append(
                 Business(
                     id=details["place_id"],
@@ -214,6 +234,8 @@ async def _search_places_api(
                     rating=details.get("rating"),
                     place_id=details["place_id"],
                     website=details.get("website"),
+                    latitude=lat,
+                    longitude=lng,
                 )
             )
 
@@ -227,13 +249,13 @@ async def _fetch_place_details(
     client: Any, place_id: str
 ) -> Optional[Dict[str, Any]]:
     """
-    Fetch details for a single place including phone number.
+    Fetch details for a single place including phone number and coordinates.
     """
     response = await client.get(
         f"{PLACES_API_URL}/details/json",
         params={
             "place_id": place_id,
-            "fields": "name,formatted_phone_number,international_phone_number,formatted_address,rating,website",
+            "fields": "name,formatted_phone_number,international_phone_number,formatted_address,rating,website,geometry",
             "key": settings.google_places_api_key,
         },
     )
@@ -251,6 +273,12 @@ async def _fetch_place_details(
     if not phone:
         return None
 
+    # Extract coordinates from geometry
+    geometry = result.get("geometry", {})
+    location = geometry.get("location", {})
+    latitude = location.get("lat")
+    longitude = location.get("lng")
+
     return {
         "place_id": place_id,
         "name": result.get("name", "Unknown"),
@@ -258,6 +286,8 @@ async def _fetch_place_details(
         "address": result.get("formatted_address"),
         "rating": result.get("rating"),
         "website": result.get("website"),
+        "latitude": latitude,
+        "longitude": longitude,
     }
 
 

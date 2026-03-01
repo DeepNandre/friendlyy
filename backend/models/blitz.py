@@ -45,6 +45,8 @@ class Business(BaseModel):
     rating: Optional[float] = Field(default=None, ge=0.0, le=5.0)
     place_id: Optional[str] = None
     website: Optional[str] = None
+    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
+    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
 
 
 # ==================== CALL MODELS ====================
