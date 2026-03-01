@@ -581,81 +581,61 @@ export default function AIChat() {
                           );
                         })()}
 
-                        {/* VibeCoder Widget with Steps component */}
+                        {/* VibeCoder — Apple-style browser mockup (replaces purple template) */}
                         {message.agent === 'build' && (
-                          <div className="border border-border rounded-2xl bg-card overflow-hidden mt-3 shadow-sm">
-                            <div className="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-violet-500/10 to-purple-500/10 border-b border-border">
-                              <div className="flex items-center gap-2">
-                                <div className="bg-gradient-to-br from-violet-500 to-purple-600 text-white p-1.5 rounded-lg">
-                                  <Code size={13} />
+                          <div className="mt-3">
+                            <BrowserMockup url={message.previewUrl || 'https://friendly.dev/preview'} className="rounded-2xl shadow-sm">
+                              {/* Build steps inside browser content */}
+                              {message.buildSteps && message.buildSteps.length > 0 && (
+                                <div className="px-4 pt-3 pb-2 border-b border-border/50">
+                                  <Steps defaultOpen={true}>
+                                    <StepsTrigger
+                                      leftIcon={
+                                        message.buildSteps.every(s => s.status === 'complete')
+                                          ? <Check size={14} className="text-green-500" />
+                                          : <Loader2 size={14} className="text-muted-foreground animate-spin" />
+                                      }
+                                    >
+                                      {message.buildSteps.every(s => s.status === 'complete')
+                                        ? 'Build complete'
+                                        : 'Building...'}
+                                    </StepsTrigger>
+                                    <StepsContent showBar={true}>
+                                      {message.buildSteps.map((step) => (
+                                        <StepsItem key={step.id} status={step.status}>
+                                          {step.label}
+                                        </StepsItem>
+                                      ))}
+                                    </StepsContent>
+                                  </Steps>
                                 </div>
-                                <span className="font-semibold text-foreground text-sm font-sans">VibeCoder</span>
-                              </div>
-                              {message.previewUrl && (
-                                <a
-                                  href={message.previewUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-violet-600 font-medium font-sans flex items-center gap-1 hover:opacity-70 transition-opacity"
-                                >
-                                  View Preview <ExternalLink size={11} />
-                                </a>
                               )}
-                            </div>
-
-                            {/* Build Steps using Steps component */}
-                            {message.buildSteps && message.buildSteps.length > 0 && (
-                              <div className="px-4 py-3">
-                                <Steps defaultOpen={true}>
-                                  <StepsTrigger
-                                    leftIcon={
-                                      message.buildSteps.every(s => s.status === 'complete')
-                                        ? <Check size={14} className="text-green-500" />
-                                        : <Loader2 size={14} className="text-violet-500 animate-spin" />
-                                    }
-                                  >
-                                    {message.buildSteps.every(s => s.status === 'complete')
-                                      ? 'Build complete'
-                                      : 'Building...'}
-                                  </StepsTrigger>
-                                  <StepsContent showBar={true}>
-                                    {message.buildSteps.map((step) => (
-                                      <StepsItem key={step.id} status={step.status}>
-                                        {step.label}
-                                      </StepsItem>
-                                    ))}
-                                  </StepsContent>
-                                </Steps>
-                              </div>
-                            )}
-
-                            {/* Preview iframe in browser mockup */}
-                            {message.previewUrl && (
-                              <div className="px-4 pb-3 mt-2">
-                                <BrowserMockup url={message.previewUrl}>
+                              {/* App preview iframe */}
+                              {message.previewUrl ? (
+                                <>
                                   <iframe
                                     src={message.previewUrl}
                                     className="w-full h-64 bg-white"
                                     title="Website Preview"
                                   />
-                                </BrowserMockup>
-                              </div>
-                            )}
-
-                            {/* Actions */}
-                            {message.previewUrl && (
-                              <div className="flex items-center gap-2 px-4 py-3 border-t border-border">
-                                <a
-                                  href={message.previewUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-white font-sans font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 hover:opacity-90 transition-opacity"
-                                >
-                                  <ExternalLink size={11} />
-                                  Open Full Preview
-                                </a>
-                              </div>
-                            )}
+                                  <div className="flex justify-center p-3 border-t border-border/50 bg-muted/20">
+                                    <a
+                                      href={message.previewUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-foreground font-sans font-medium flex items-center gap-1.5 px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors border border-border"
+                                    >
+                                      <ExternalLink size={12} />
+                                      Open Full Preview
+                                    </a>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="grid place-content-center h-48 text-muted-foreground text-sm font-sans">
+                                  Preparing preview...
+                                </div>
+                              )}
+                            </BrowserMockup>
                           </div>
                         )}
                       </>
