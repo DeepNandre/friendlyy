@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Zap,
   MessageSquare,
+  ExternalLink,
 } from 'lucide-react';
 import { useBlitzStream, CallStatusType } from '../hooks/useBlitzStream';
 
@@ -22,6 +23,7 @@ type AgentType = 'blitz' | 'vibecoder' | 'chat' | null;
 interface CallStatus {
   business: string;
   phone?: string;
+  address?: string;
   status: 'pending' | 'ringing' | 'connected' | 'complete' | 'failed' | 'no_answer' | 'busy';
   result?: string;
   error?: string;
@@ -63,6 +65,7 @@ export default function AIChat() {
     const mappedStatuses: CallStatus[] = stream.callStatuses.map((cs) => ({
       business: cs.business,
       phone: cs.phone,
+      address: cs.address,
       status: mapCallStatus(cs.status),
       result: cs.result,
       error: cs.error,
@@ -203,8 +206,8 @@ export default function AIChat() {
           {/* Welcome State */}
           {messages.length === 0 && (
             <div className="flex-1 flex flex-col items-center justify-center text-center max-w-lg mx-auto gap-6 min-h-[60vh]">
-              <div className="w-20 h-20 rounded-[22px] bg-foreground flex items-center justify-center text-background shadow-2xl shadow-foreground/20">
-                <Sparkles size={32} />
+              <div className="w-20 h-20 rounded-[22px] bg-background flex items-center justify-center p-2 shadow-2xl shadow-foreground/20 border border-border overflow-hidden">
+                <img src="/friendly-logo-monochrome.jpg" alt="Friendly" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-4xl font-serif text-foreground mb-3">Hey, I'm Friendly</h1>
@@ -239,9 +242,6 @@ export default function AIChat() {
                 {/* User */}
                 {message.role === 'user' && (
                   <div className="flex items-start gap-3.5">
-                    <div className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-semibold font-sans shrink-0 mt-0.5">
-                      U
-                    </div>
                     <p className="text-[15px] text-foreground leading-relaxed font-sans pt-1">{message.content}</p>
                   </div>
                 )}
@@ -268,65 +268,123 @@ export default function AIChat() {
                         )}
                         <p className="text-[15px] text-foreground leading-relaxed font-sans">{message.content}</p>
 
-                        {/* Blitz Call Widget */}
-                        {message.agent === 'blitz' && message.callStatuses && message.callStatuses.length > 0 && (
-                          <div className="rounded-2xl bg-card overflow-hidden mt-2 shadow-md border border-border/60">
-                            {/* Header */}
-                            <div className="px-5 py-4 bg-gradient-to-r from-accent/40 to-accent/10 border-b border-border/60">
-                              <div className="flex items-center gap-3">
-                                <div className="bg-foreground text-background p-2 rounded-xl shadow-sm">
-                                  <Phone size={14} />
-                                </div>
-                                <div>
-                                  <h3 className="font-semibold text-foreground text-sm font-sans tracking-tight">Blitz Calls</h3>
-                                  <p className="text-xs text-muted-foreground font-sans mt-0.5">
-                                    {message.callStatuses.filter(c => c.status === 'complete').length} of {message.callStatuses.length} calls complete
-                                  </p>
-                                </div>
-                              </div>
-                              {/* Progress bar */}
-                              <div className="mt-3 h-1 bg-border/50 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-foreground/80 rounded-full transition-all duration-500 ease-out"
-                                  style={{
-                                    width: `${(message.callStatuses.filter(c => ['complete', 'failed', 'no_answer', 'busy'].includes(c.status)).length / message.callStatuses.length) * 100}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            {/* Call list */}
-                            <div className="divide-y divide-border/40">
-                              {message.callStatuses.map((call, idx) => (
-                                <div key={idx} className="flex items-center justify-between px-5 py-3.5 hover:bg-muted/30 transition-colors">
-                                  <div className="flex items-center gap-3.5">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                                      call.status === 'complete' ? 'bg-emerald-500/10 text-emerald-600' :
-                                      call.status === 'ringing' ? 'bg-amber-500/10 text-amber-500' :
-                                      call.status === 'connected' ? 'bg-blue-500/10 text-blue-500' :
-                                      call.status === 'failed' || call.status === 'no_answer' || call.status === 'busy' ? 'bg-destructive/10 text-destructive' :
-                                      'bg-muted text-muted-foreground'
-                                    }`}>
-                                      {getStatusIcon(call.status)}
+                        {/* Blitz Call Widget - FaceTime Style */}
+                        {message.agent === 'blitz' && message.callStatuses && message.callStatuses.length > 0 && (() => {
+                          const completedCalls = message.callStatuses.filter(c => c.status === 'complete');
+                          const firstSuccessIdx = message.callStatuses.findIndex(c => c.status === 'complete' && c.result);
+
+                          return (
+                            <div className="rounded-2xl bg-card overflow-hidden mt-3 shadow-lg border border-border">
+                              {/* Header */}
+                              <div className="px-5 py-4 border-b border-border">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-foreground text-background p-2.5 rounded-xl">
+                                      <Phone size={16} />
                                     </div>
                                     <div>
-                                      <p className="text-sm font-medium text-foreground font-sans leading-tight">{call.business}</p>
-                                      {call.phone && <p className="text-xs text-muted-foreground font-sans mt-0.5">{call.phone}</p>}
+                                      <h3 className="font-semibold text-foreground text-[15px] font-sans">Blitz Calls</h3>
+                                      <p className="text-xs text-muted-foreground font-sans">
+                                        {completedCalls.length} of {message.callStatuses.length} calls complete
+                                      </p>
                                     </div>
                                   </div>
-                                  <div className="text-right max-w-[45%]">
-                                    {call.result ? (
-                                      <span className="text-xs font-medium text-foreground bg-accent/50 px-2.5 py-1 rounded-full font-sans inline-block">{call.result}</span>
-                                    ) : call.error ? (
-                                      <span className="text-xs text-destructive font-sans">{call.error}</span>
-                                    ) : (
-                                      <span className="text-xs text-muted-foreground font-sans">{getStatusText(call.status)}</span>
-                                    )}
-                                  </div>
+                                  <span className="text-sm text-muted-foreground font-sans">
+                                    {completedCalls.length}/{message.callStatuses.length} complete
+                                  </span>
                                 </div>
-                              ))}
+                                {/* Progress bar */}
+                                <div className="mt-3 h-1 bg-border rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-foreground rounded-full transition-all duration-500 ease-out"
+                                    style={{
+                                      width: `${(message.callStatuses.filter(c => ['complete', 'failed', 'no_answer', 'busy'].includes(c.status)).length / message.callStatuses.length) * 100}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Call list */}
+                              <div className="divide-y divide-border">
+                                {message.callStatuses.map((call, idx) => {
+                                  const isSuccess = call.status === 'complete' && call.result;
+                                  const isBestOption = idx === firstSuccessIdx;
+                                  const isFailed = call.status === 'failed' || call.status === 'no_answer' || call.status === 'busy';
+
+                                  return (
+                                    <div key={idx} className={`px-5 py-4 ${isBestOption ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}`}>
+                                      <div className="flex items-start gap-4">
+                                        {/* Status icon */}
+                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                                          isSuccess ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30' :
+                                          isFailed ? 'bg-red-100 text-red-500 dark:bg-red-900/30' :
+                                          call.status === 'ringing' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30' :
+                                          call.status === 'connected' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' :
+                                          'bg-muted text-muted-foreground'
+                                        }`}>
+                                          {isSuccess ? <Check size={14} strokeWidth={2.5} /> :
+                                           isFailed ? <X size={14} strokeWidth={2.5} /> :
+                                           getStatusIcon(call.status)}
+                                        </div>
+
+                                        {/* Business info */}
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-medium text-foreground text-[15px] font-sans">{call.business}</span>
+                                            {isBestOption && (
+                                              <span className="bg-amber-400 text-amber-900 text-[11px] font-semibold px-2 py-0.5 rounded-full font-sans">
+                                                Best option
+                                              </span>
+                                            )}
+                                          </div>
+                                          {call.phone && (
+                                            <div className="flex items-center gap-1.5 mt-1">
+                                              {isSuccess && <Check size={12} className="text-emerald-500" />}
+                                              <span className="text-sm text-muted-foreground font-sans">{call.phone}</span>
+                                            </div>
+                                          )}
+                                          {call.address && (
+                                            <p className="text-sm text-muted-foreground font-sans mt-0.5">{call.address}</p>
+                                          )}
+                                        </div>
+
+                                        {/* Result / Status */}
+                                        <div className="text-right shrink-0 flex flex-col items-end gap-2">
+                                          {call.result ? (
+                                            <span className="text-sm font-medium text-foreground bg-amber-100 dark:bg-amber-900/40 px-3 py-1.5 rounded-full font-sans">
+                                              {call.result}
+                                            </span>
+                                          ) : isFailed ? (
+                                            <span className="text-sm text-muted-foreground font-sans">No answer</span>
+                                          ) : (
+                                            <span className="text-sm text-muted-foreground font-sans">{getStatusText(call.status)}</span>
+                                          )}
+
+                                          {/* Action buttons for successful calls */}
+                                          {isSuccess && (
+                                            <div className="flex items-center gap-2 mt-1">
+                                              <a
+                                                href={`tel:${call.phone}`}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-background border border-border rounded-full hover:bg-muted transition-colors font-sans"
+                                              >
+                                                <Phone size={11} />
+                                                Call them
+                                              </a>
+                                              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-background border border-border rounded-full hover:bg-muted transition-colors font-sans">
+                                                <ExternalLink size={11} />
+                                                Details
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
 
                         {/* VibeCoder Widget */}
                         {message.agent === 'vibecoder' && (
