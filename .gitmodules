@@ -1,0 +1,3 @@
+[submodule "emergent-shipmate-vibecoder"]
+	path = emergent-shipmate-vibecoder
+	url = https://github.com/DeepNandre/emergent-shipmate-vibecoder.git
