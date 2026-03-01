@@ -271,115 +271,95 @@ export default function AIChat() {
                         )}
                         <p className="text-[15px] text-foreground leading-relaxed font-sans">{message.content}</p>
 
-                        {/* Blitz Call Widget - FaceTime Style */}
+                        {/* Blitz Call Widget - macOS FaceTime Style */}
                         {message.agent === 'blitz' && message.callStatuses && message.callStatuses.length > 0 && (() => {
                           const completedCalls = message.callStatuses.filter(c => c.status === 'complete');
                           const firstSuccessIdx = message.callStatuses.findIndex(c => c.status === 'complete' && c.result);
 
                           return (
-                            <div className="rounded-2xl bg-card overflow-hidden mt-3 shadow-lg border border-border">
+                            <div className="w-full max-w-3xl mx-auto rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] border border-gray-200/80 bg-[#f5f6f8] overflow-hidden text-gray-800 font-sans mt-3">
+
                               {/* Header */}
-                              <div className="px-5 py-4 border-b border-border">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <div className="bg-foreground text-background p-2.5 rounded-xl">
-                                      <Phone size={16} />
-                                    </div>
-                                    <div>
-                                      <h3 className="font-semibold text-foreground text-[15px] font-sans">Blitz Calls</h3>
-                                      <p className="text-xs text-muted-foreground font-sans">
-                                        {completedCalls.length} of {message.callStatuses.length} calls complete
-                                      </p>
-                                    </div>
+                              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200/80 bg-white/50 backdrop-blur-sm">
+                                <div className="flex items-center gap-2">
+                                  {/* FaceTime Icon */}
+                                  <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-[#44D955] to-[#34C759] flex items-center justify-center shadow-sm">
+                                    <svg width="16" height="12" viewBox="0 0 16 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M12 2.5C12 1.67157 11.3284 1 10.5 1H2.5C1.67157 1 1 1.67157 1 2.5V9.5C1 10.3284 1.67157 11 2.5 11H10.5C11.3284 11 12 10.3284 12 9.5V2.5Z" fill="white"/>
+                                      <path d="M15.5 3.5L12.5 5.5V6.5L15.5 8.5C15.7761 8.68406 16 8.48528 16 8.15535V3.84465C16 3.51472 15.7761 3.31594 15.5 3.5Z" fill="white"/>
+                                    </svg>
                                   </div>
-                                  <span className="text-sm text-muted-foreground font-sans">
-                                    {completedCalls.length}/{message.callStatuses.length} complete
-                                  </span>
+                                  <span className="font-semibold text-[17px] text-gray-900 tracking-tight">FaceTime</span>
                                 </div>
-                                {/* Progress bar */}
-                                <div className="mt-3 h-1 bg-border rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-foreground rounded-full transition-all duration-500 ease-out"
-                                    style={{
-                                      width: `${(message.callStatuses.filter(c => ['complete', 'failed', 'no_answer', 'busy'].includes(c.status)).length / message.callStatuses.length) * 100}%`,
-                                    }}
-                                  />
-                                </div>
+                                <span className="text-sm text-gray-500 font-medium">{completedCalls.length}/{message.callStatuses.length} complete</span>
                               </div>
 
-                              {/* Call list */}
-                              <div className="divide-y divide-border">
+                              {/* List Container */}
+                              <div className="flex flex-col">
                                 {message.callStatuses.map((call, idx) => {
                                   const isSuccess = call.status === 'complete' && call.result;
                                   const isBestOption = idx === firstSuccessIdx;
                                   const isFailed = call.status === 'failed' || call.status === 'no_answer' || call.status === 'busy';
+                                  const isLast = idx === message.callStatuses.length - 1;
 
                                   return (
-                                    <div key={idx} className={`px-5 py-4 ${isBestOption ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}`}>
-                                      <div className="flex items-start gap-4">
-                                        {/* Status icon */}
-                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                                          isSuccess ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30' :
-                                          isFailed ? 'bg-red-100 text-red-500 dark:bg-red-900/30' :
-                                          call.status === 'ringing' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30' :
-                                          call.status === 'connected' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' :
-                                          'bg-muted text-muted-foreground'
-                                        }`}>
-                                          {isSuccess ? <Check size={14} strokeWidth={2.5} /> :
-                                           isFailed ? <X size={14} strokeWidth={2.5} /> :
-                                           getStatusIcon(call.status)}
-                                        </div>
-
-                                        {/* Business info */}
-                                        <div className="flex-1 min-w-0">
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-medium text-foreground text-[15px] font-sans">{call.business}</span>
-                                            {isBestOption && (
-                                              <span className="bg-amber-400 text-amber-900 text-[11px] font-semibold px-2 py-0.5 rounded-full font-sans">
-                                                Best option
-                                              </span>
-                                            )}
-                                          </div>
-                                          {call.phone && (
-                                            <div className="flex items-center gap-1.5 mt-1">
-                                              {isSuccess && <Check size={12} className="text-emerald-500" />}
-                                              <span className="text-sm text-muted-foreground font-sans">{call.phone}</span>
-                                            </div>
-                                          )}
-                                          {call.address && (
-                                            <p className="text-sm text-muted-foreground font-sans mt-0.5">{call.address}</p>
-                                          )}
-                                        </div>
-
-                                        {/* Result / Status */}
-                                        <div className="text-right shrink-0 flex flex-col items-end gap-2">
-                                          {call.result ? (
-                                            <span className="text-sm font-medium text-foreground bg-amber-100 dark:bg-amber-900/40 px-3 py-1.5 rounded-full font-sans">
-                                              {call.result}
+                                    <div key={idx} className={`flex justify-between items-start px-4 py-4 ${!isLast ? 'border-b border-gray-200/80' : ''}`}>
+                                      <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-[15px] text-gray-900">{call.business}</span>
+                                          {isBestOption && (
+                                            <span className="px-2 py-0.5 text-[11px] font-semibold bg-[#FFD60A] text-black rounded-full shadow-sm">
+                                              Best option
                                             </span>
-                                          ) : isFailed ? (
-                                            <span className="text-sm text-muted-foreground font-sans">No answer</span>
-                                          ) : (
-                                            <span className="text-sm text-muted-foreground font-sans">{getStatusText(call.status)}</span>
-                                          )}
-
-                                          {/* Action buttons for successful calls */}
-                                          {isSuccess && (
-                                            <div className="flex items-center gap-2 mt-1">
-                                              <a
-                                                href={`tel:${call.phone}`}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-background border border-border rounded-full hover:bg-muted transition-colors font-sans"
-                                              >
-                                                <Phone size={11} />
-                                                Call them
-                                              </a>
-                                              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-background border border-border rounded-full hover:bg-muted transition-colors font-sans">
-                                                <ExternalLink size={11} />
-                                                Details
-                                              </button>
-                                            </div>
                                           )}
                                         </div>
+                                        {call.phone && (
+                                          <div className="flex items-center gap-2">
+                                            {isSuccess ? (
+                                              <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                              </svg>
+                                            ) : isFailed ? (
+                                              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                              </svg>
+                                            ) : (
+                                              <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" />
+                                            )}
+                                            <span className="text-[13px] text-gray-500">{call.phone}</span>
+                                          </div>
+                                        )}
+                                        {call.address && (
+                                          <span className="text-[13px] text-gray-500 mt-0.5">{call.address}</span>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-col items-end gap-3">
+                                        {call.result ? (
+                                          <span className="text-[14px] text-gray-900">{call.result}</span>
+                                        ) : isFailed ? (
+                                          <span className="text-[14px] text-gray-500">No answer</span>
+                                        ) : (
+                                          <span className="text-[14px] text-gray-500">{getStatusText(call.status)}</span>
+                                        )}
+                                        {isSuccess && (
+                                          <div className="flex gap-2">
+                                            <a
+                                              href={`tel:${call.phone}`}
+                                              className="flex items-center gap-1.5 px-3 py-1 bg-[#F9F9FB] border border-gray-300/80 rounded-full text-[13px] text-gray-700 font-medium hover:bg-gray-100 transition-colors shadow-sm"
+                                            >
+                                              <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                              </svg>
+                                              Call them
+                                            </a>
+                                            <button className="flex items-center gap-1.5 px-3 py-1 bg-[#F9F9FB] border border-gray-300/80 rounded-full text-[13px] text-gray-700 font-medium hover:bg-gray-100 transition-colors shadow-sm">
+                                              <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                              </svg>
+                                              Details
+                                            </button>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   );
