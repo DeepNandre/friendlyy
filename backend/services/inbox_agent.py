@@ -73,7 +73,11 @@ async def _cache_summary(entity_id: str, summary: InboxSummary) -> None:
 
 def _get_composio_toolset():
     """Initialize Composio toolset with API key from settings."""
-    from composio import ComposioToolSet
+    try:
+        from composio import ComposioToolSet
+    except ImportError:
+        logger.error("composio package not installed - inbox check disabled")
+        raise ValueError("Composio not installed. Run: pip install composio-core")
 
     settings = get_settings()
     if not settings.composio_api_key:
