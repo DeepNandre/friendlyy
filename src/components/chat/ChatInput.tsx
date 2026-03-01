@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Sparkles, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 
 interface ChatInputProps {
   input: string;
@@ -21,9 +21,6 @@ export default function ChatInput({ input, isLoading, onInputChange, onSend }: C
     <div className="sticky bottom-0 bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-5 px-4 md:px-20 lg:px-36">
       <div className="max-w-2xl mx-auto">
         <div className="bg-card border border-border rounded-2xl shadow-lg shadow-foreground/8 flex items-center p-2 gap-2">
-          <div className="pl-2 text-accent">
-            <Sparkles size={17} />
-          </div>
           <input
             ref={inputRef}
             type="text"
@@ -31,7 +28,7 @@ export default function ChatInput({ input, isLoading, onInputChange, onSend }: C
             onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onSend()}
             placeholder="Ask me anything... Find services, build apps, get quotes"
-            className="flex-1 outline-none text-sm text-foreground placeholder-muted-foreground bg-transparent min-w-0 py-2 font-sans"
+            className="flex-1 outline-none text-sm text-foreground placeholder-muted-foreground bg-transparent min-w-0 py-2 pl-3 font-sans"
             disabled={isLoading}
           />
           <button

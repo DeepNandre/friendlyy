@@ -242,6 +242,9 @@ export default function AIChat() {
                 {/* User */}
                 {message.role === 'user' && (
                   <div className="flex items-start gap-3.5">
+                    <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center p-1 shrink-0 mt-0.5 border border-border overflow-hidden">
+                      <img src="/friendly-logo-monochrome.jpg" alt="You" className="w-full h-full object-contain" />
+                    </div>
                     <p className="text-[15px] text-foreground leading-relaxed font-sans pt-1">{message.content}</p>
                   </div>
                 )}
@@ -421,9 +424,6 @@ export default function AIChat() {
         <div className="sticky bottom-0 bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-5 px-8 md:px-20 lg:px-36">
           <div className="max-w-2xl mx-auto">
             <div className="bg-card border border-border rounded-2xl shadow-lg shadow-foreground/8 flex items-center p-2 gap-2">
-              <div className="pl-2 text-accent">
-                <Sparkles size={17} />
-              </div>
               <input
                 ref={inputRef}
                 type="text"
@@ -431,7 +431,7 @@ export default function AIChat() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 placeholder="Ask me anything... Find services, build apps, get quotes"
-                className="flex-1 outline-none text-sm text-foreground placeholder-muted-foreground bg-transparent min-w-0 py-2 font-sans"
+                className="flex-1 outline-none text-sm text-foreground placeholder-muted-foreground bg-transparent min-w-0 py-2 pl-3 font-sans"
                 disabled={isLoading}
               />
               <button
