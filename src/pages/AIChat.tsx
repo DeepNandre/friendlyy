@@ -22,6 +22,7 @@ import { useBuildStream } from '../hooks/useBuildStream';
 import { Markdown } from '../components/ui/markdown';
 import { SourceList } from '../components/ui/source';
 import { Steps, StepsTrigger, StepsContent, StepsItem } from '../components/ui/steps';
+import { BrowserMockup } from '../components/ui/browser-mockup';
 import {
   PromptInput,
   PromptInputTextarea,
@@ -628,14 +629,16 @@ export default function AIChat() {
                               </div>
                             )}
 
-                            {/* Preview iframe */}
+                            {/* Preview iframe in browser mockup */}
                             {message.previewUrl && (
-                              <div className="border-t border-border">
-                                <iframe
-                                  src={message.previewUrl}
-                                  className="w-full h-64 bg-white"
-                                  title="Website Preview"
-                                />
+                              <div className="px-4 pb-3 mt-2">
+                                <BrowserMockup url={message.previewUrl}>
+                                  <iframe
+                                    src={message.previewUrl}
+                                    className="w-full h-64 bg-white"
+                                    title="Website Preview"
+                                  />
+                                </BrowserMockup>
                               </div>
                             )}
 
