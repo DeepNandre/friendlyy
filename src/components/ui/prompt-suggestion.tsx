@@ -20,19 +20,19 @@ function PromptSuggestion({
 
   if (!isHighlightMode) {
     return (
-      <Button
-        variant="outline"
-        size="sm"
+      <button
+        type="button"
         className={cn(
-          "rounded-full px-4 py-2 h-auto text-sm font-medium",
-          "bg-card hover:bg-muted border-border text-foreground",
-          "transition-all hover:shadow-sm",
+          "rounded-full px-3 py-1.5 text-xs font-medium",
+          "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground",
+          "border border-transparent hover:border-border/50",
+          "transition-colors",
           className
         )}
         {...props}
       >
         {children}
-      </Button>
+      </button>
     )
   }
 

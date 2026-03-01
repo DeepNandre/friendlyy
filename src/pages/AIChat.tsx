@@ -79,10 +79,10 @@ const BLITZ_API_BASE =
 
 // Prompt suggestions for the welcome screen
 const PROMPT_SUGGESTIONS = [
-  { text: 'Find me a plumber in London', icon: <Phone size={14} /> },
-  { text: 'Build a landing page for my startup', icon: <Code size={14} /> },
-  { text: 'Get quotes from 3 electricians', icon: <Sparkles size={14} /> },
-  { text: 'Create a restaurant menu website', icon: <FileText size={14} /> },
+  { text: 'Find me a plumber in London', icon: <Phone size={12} /> },
+  { text: 'Build a landing page for my startup', icon: <Code size={12} /> },
+  { text: 'Get quotes from 3 electricians', icon: <Sparkles size={12} /> },
+  { text: 'Create a restaurant menu website', icon: <FileText size={12} /> },
 ];
 
 export default function AIChat() {
@@ -311,15 +311,15 @@ export default function AIChat() {
                 </p>
               </div>
 
-              {/* Prompt Suggestions */}
-              <div className="flex flex-wrap gap-2.5 justify-center mt-2">
+              {/* Prompt Suggestions - minimal bubbles */}
+              <div className="flex flex-wrap gap-2 justify-center mt-3">
                 {PROMPT_SUGGESTIONS.map((suggestion) => (
                   <PromptSuggestion
                     key={suggestion.text}
                     onClick={() => handleSuggestionClick(suggestion.text)}
                   >
-                    <span className="flex items-center gap-2">
-                      <span className="text-muted-foreground">{suggestion.icon}</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="text-muted-foreground/70 opacity-80">{suggestion.icon}</span>
                       {suggestion.text}
                     </span>
                   </PromptSuggestion>
@@ -572,20 +572,21 @@ export default function AIChat() {
               />
               <PromptInputBottomBar>
                 <PromptInputChips>
-                  <PromptInputChip
-                    icon={<Globe size={14} />}
-                    active={webSearchEnabled}
-                    onClick={() => setWebSearchEnabled(!webSearchEnabled)}
-                  >
-                    Web search
-                  </PromptInputChip>
-                </PromptInputChips>
-                <PromptInputActions>
                   <ModelSelectorDropdown
                     models={MISTRAL_MODELS}
                     selectedModel={selectedModel}
                     onModelChange={setSelectedModel}
                   />
+                  <PromptInputChip
+                    icon={<Globe size={12} />}
+                    active={webSearchEnabled}
+                    onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                    className="px-2 py-1 text-xs gap-1"
+                  >
+                    Web search
+                  </PromptInputChip>
+                </PromptInputChips>
+                <PromptInputActions>
                   <PromptInputAction tooltip="Attach file" side="top">
                     <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
                       <Paperclip size={18} />
