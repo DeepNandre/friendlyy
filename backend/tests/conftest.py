@@ -31,9 +31,14 @@ def mock_settings(monkeypatch):
     monkeypatch.setenv("BACKEND_URL", "http://localhost:8000")
     monkeypatch.setenv("DEMO_MODE", "false")
 
-    # Clear cached settings
+    # Clear cached settings and rebuild with test env vars
     from core.config import get_settings
     get_settings.cache_clear()
+    fresh_settings = get_settings()
+
+    # Patch the module-level settings reference in core.mistral
+    # (it imports settings at module load time, so env changes alone don't reach it)
+    monkeypatch.setattr("core.mistral.settings", fresh_settings)
 
     yield
 
@@ -78,6 +83,26 @@ NVIDIA_ROUTER_RESPONSE_CHAT = {
         {
             "message": {
                 "content": '{"agent": "chat", "params": {"type": "greeting"}, "confidence": 1.0}'
+            }
+        }
+    ]
+}
+
+NVIDIA_ROUTER_RESPONSE_INBOX = {
+    "choices": [
+        {
+            "message": {
+                "content": '{"agent": "inbox", "params": {"action": "check"}, "confidence": 0.95}'
+            }
+        }
+    ]
+}
+
+NVIDIA_INBOX_SUMMARY_RESPONSE = {
+    "choices": [
+        {
+            "message": {
+                "content": '{"important_count": 3, "top_updates": ["Meeting at 3pm", "AWS bill due", "PR approved"], "needs_action": true, "draft_replies_available": false, "sender_highlights": ["Product Team", "AWS"]}'
             }
         }
     ]

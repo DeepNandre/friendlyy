@@ -12,6 +12,7 @@ from services.blitz import run_blitz_workflow
 from services.demo_mode import run_demo_workflow
 from services.build_agent import run_build_workflow
 from services.chat import generate_chat_response
+from services.inbox_agent import run_inbox_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,8 @@ async def chat(
         return _handle_not_implemented("bounce", result)
     elif result.agent == AgentType.QUEUE:
         return await _handle_queue(request, result, background_tasks)
+    elif result.agent == AgentType.INBOX:
+        return await _handle_inbox(request, result, background_tasks)
     elif result.agent == AgentType.BID:
         return _handle_not_implemented("bid", result)
     else:
@@ -231,6 +234,34 @@ async def _handle_queue(
         status="calling",
         message=f"On it! I'm calling {business_name} and will wait on hold for you. I'll let you know when a human picks up.",
         stream_url=f"/api/blitz/stream/{session_id}",
+    )
+
+
+async def _handle_inbox(
+    request: ChatRequest,
+    result,
+    background_tasks: BackgroundTasks,
+) -> ChatResponse:
+    """Handle Inbox agent requests — check Gmail."""
+    import uuid
+
+    session_id = str(uuid.uuid4())
+    entity_id = request.entity_id or "default"
+
+    background_tasks.add_task(
+        run_inbox_workflow,
+        user_message=request.message,
+        params=result.params,
+        session_id=session_id,
+        entity_id=entity_id,
+    )
+
+    return ChatResponse(
+        session_id=session_id,
+        agent=AgentType.INBOX,
+        status="checking",
+        message="Let me check your inbox...",
+        stream_url=f"/api/inbox/stream/{session_id}",
     )
 
 

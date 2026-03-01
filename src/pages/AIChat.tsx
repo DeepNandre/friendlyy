@@ -16,9 +16,12 @@ import {
   Paperclip,
   Globe,
   FileText,
+  Mail,
 } from 'lucide-react';
 import { useBlitzStream, CallStatusType } from '../hooks/useBlitzStream';
 import { useBuildStream } from '../hooks/useBuildStream';
+import { useInboxStream, InboxSummary } from '../hooks/useInboxStream';
+import { InboxPreviewCard } from '../components/chat/InboxPreviewCard';
 import { Markdown } from '../components/ui/markdown';
 import { SourceList } from '../components/ui/source';
 import { Steps, StepsTrigger, StepsContent, StepsItem } from '../components/ui/steps';
@@ -42,7 +45,7 @@ import {
 } from '../components/ui/chat-history';
 
 type MessageRole = 'user' | 'assistant';
-type AgentType = 'blitz' | 'build' | 'chat' | null;
+type AgentType = 'blitz' | 'build' | 'chat' | 'inbox' | null;
 
 interface CallStatus {
   business: string;
@@ -78,6 +81,9 @@ interface Message {
   previewUrl?: string;
   buildSteps?: BuildStep[];
   sources?: SourceInfo[];
+  inboxSummary?: InboxSummary;
+  inboxAuthUrl?: string | null;
+  inboxStatus?: string;
 }
 
 const BLITZ_API_BASE =
@@ -88,7 +94,7 @@ const PROMPT_SUGGESTIONS = [
   { text: 'Find me a plumber in London', icon: <Phone size={12} /> },
   { text: 'Build a landing page for my startup', icon: <Code size={12} /> },
   { text: 'Get quotes from 3 electricians', icon: <Sparkles size={12} /> },
-  { text: 'Create a restaurant menu website', icon: <FileText size={12} /> },
+  { text: 'Check my email', icon: <Mail size={12} /> },
 ];
 
 export default function AIChat() {
@@ -99,6 +105,8 @@ export default function AIChat() {
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [activeBuildSessionId, setActiveBuildSessionId] = useState<string | null>(null);
   const [activeBuildMessageId, setActiveBuildMessageId] = useState<string | null>(null);
+  const [activeInboxSessionId, setActiveInboxSessionId] = useState<string | null>(null);
+  const [activeInboxMessageId, setActiveInboxMessageId] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState('mixtral-8x7b');
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -111,6 +119,7 @@ export default function AIChat() {
 
   const stream = useBlitzStream(activeSessionId);
   const buildStream = useBuildStream(activeBuildSessionId);
+  const inboxStream = useInboxStream(activeInboxSessionId);
 
   // When selecting a session from history, load its messages
   const handleSelectSession = (sessionId: string) => {
@@ -237,6 +246,38 @@ export default function AIChat() {
     }
   }, [buildStream, activeBuildMessageId, activeBuildSessionId]);
 
+  // Handle inbox stream updates
+  useEffect(() => {
+    if (!activeInboxMessageId || !activeInboxSessionId) return;
+
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== activeInboxMessageId) return msg;
+        let content = msg.content;
+        if (inboxStream.inboxStatus === 'checking') content = 'Checking your Gmail connection...';
+        else if (inboxStream.inboxStatus === 'auth_required') content = 'You need to connect your Gmail account.';
+        else if (inboxStream.inboxStatus === 'fetching') content = 'Fetching your emails...';
+        else if (inboxStream.inboxStatus === 'summarizing') content = `Summarizing ${inboxStream.emailCount || ''} emails...`;
+        else if (inboxStream.inboxStatus === 'complete' && inboxStream.summary) content = inboxStream.message || 'Here\'s your inbox summary:';
+        else if (inboxStream.inboxStatus === 'error') content = inboxStream.error || 'Something went wrong checking your inbox.';
+        return {
+          ...msg,
+          content,
+          isThinking: false,
+          inboxSummary: inboxStream.summary || msg.inboxSummary,
+          inboxAuthUrl: inboxStream.authUrl || msg.inboxAuthUrl,
+          inboxStatus: inboxStream.inboxStatus || msg.inboxStatus,
+        };
+      })
+    );
+
+    if (inboxStream.inboxStatus === 'complete' || inboxStream.inboxStatus === 'error' || inboxStream.inboxStatus === 'auth_required') {
+      setIsLoading(false);
+      setActiveInboxSessionId(null);
+      setActiveInboxMessageId(null);
+    }
+  }, [inboxStream, activeInboxMessageId, activeInboxSessionId]);
+
   const mapCallStatus = (status: CallStatusType): CallStatus['status'] => {
     switch (status) {
       case 'pending': return 'pending';
@@ -277,6 +318,13 @@ export default function AIChat() {
           content: m.content,
         }));
 
+      // Get or create entity ID for Composio (session-scoped)
+      let entityId = localStorage.getItem('friendly_entity_id');
+      if (!entityId) {
+        entityId = `inbox-${crypto.randomUUID()}`;
+        localStorage.setItem('friendly_entity_id', entityId);
+      }
+
       const response = await fetch(`${BLITZ_API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -285,6 +333,7 @@ export default function AIChat() {
           conversation_history: conversationHistory,
           model: selectedModel,
           web_search: webSearchEnabled,
+          entity_id: entityId,
         }),
       });
       if (!response.ok) throw new Error('Failed');
@@ -319,6 +368,9 @@ export default function AIChat() {
         if (chatHistory.currentSessionId) {
           chatHistory.updateSession(chatHistory.currentSessionId, { type: 'build' });
         }
+      } else if (data.agent === 'inbox' && data.session_id) {
+        setActiveInboxSessionId(data.session_id);
+        setActiveInboxMessageId(thinkingMessageId);
       } else {
         setIsLoading(false);
       }
@@ -654,6 +706,16 @@ export default function AIChat() {
                               </div>
                             )}
                           </div>
+                        )}
+
+                        {/* Inbox Preview Card */}
+                        {message.agent === 'inbox' && (
+                          <InboxPreviewCard
+                            status={message.inboxStatus || 'checking'}
+                            summary={message.inboxSummary}
+                            authUrl={message.inboxAuthUrl}
+                            error={message.inboxStatus === 'error' ? message.content : undefined}
+                          />
                         )}
                       </>
                     )}

@@ -6,13 +6,11 @@ Handles general conversation when not routing to specific agents.
 import logging
 from typing import Optional
 
-from core import get_http_client, settings
+from core import settings
+from core.mistral import call_mistral, MistralError
 from services.weave_tracing import traced, log_chat_response
 
 logger = logging.getLogger(__name__)
-
-# NVIDIA NIM endpoint
-NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 
 SYSTEM_PROMPT = """You are Friendly — the user's AI companion. Warm, funny, and genuinely on their side. Powered by Mistral AI.
 
@@ -89,53 +87,31 @@ async def generate_chat_response(
     Returns:
         The AI's response text
     """
-    # Check for API key
-    if not settings.nvidia_api_key:
-        logger.warning("NVIDIA_API_KEY not set, using fallback response")
-        return _fallback_response(user_message)
+    # Build messages
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    # Resolve model - use Mistral API if available for some models, else NVIDIA NIM
-    api_url = NVIDIA_API_URL
-    headers = {
-        "Authorization": f"Bearer {settings.nvidia_api_key}",
-        "Content-Type": "application/json",
-    }
+    # Add conversation history - last 12 messages (6 exchanges) for richer context
+    if conversation_history:
+        for msg in conversation_history[-12:]:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if content.strip():
+                messages.append({"role": role, "content": content})
+
+    # Add current message
+    messages.append({"role": "user", "content": user_message})
+
     nim_model = MODEL_MAP.get(model_id or "mixtral-8x7b", "mistralai/mixtral-8x7b-instruct-v0.1")
 
     try:
-        # Build messages
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-        # Add conversation history - last 12 messages (6 exchanges) for richer context
-        if conversation_history:
-            for msg in conversation_history[-12:]:
-                role = msg.get("role", "user")
-                content = msg.get("content", "")
-                if content.strip():
-                    messages.append({"role": role, "content": content})
-
-        # Add current message
-        messages.append({"role": "user", "content": user_message})
-
-        client = await get_http_client()
-        response = await client.post(
-            api_url,
-            headers=headers,
-            json={
-                "model": nim_model,
-                "messages": messages,
-                "temperature": 0.8,
-                "max_tokens": 1024,
-            },
+        content = await call_mistral(
+            messages=messages,
+            model=nim_model,
+            temperature=0.8,
+            max_tokens=1024,
             timeout=30.0,
         )
-
-        response.raise_for_status()
-        result = response.json()
-
-        content = result["choices"][0]["message"]["content"].strip()
         logger.info(f"Generated chat response: {content[:100]}...")
-
         return content
 
     except Exception as e:
@@ -192,26 +168,15 @@ Results:
 Write a warm, funny 2-4 sentence wrap-up. Include results if any. Offer to retry with different businesses if none answered."""
 
     try:
-        client = await get_http_client()
-        response = await client.post(
-            NVIDIA_API_URL,
-            headers={
-                "Authorization": f"Bearer {settings.nvidia_api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "mistralai/mixtral-8x7b-instruct-v0.1",
-                "messages": [
-                    {"role": "system", "content": AGENT_SUMMARY_PROMPT},
-                    {"role": "user", "content": context},
-                ],
-                "temperature": 0.9,
-                "max_tokens": 300,
-            },
+        content = await call_mistral(
+            messages=[
+                {"role": "system", "content": AGENT_SUMMARY_PROMPT},
+                {"role": "user", "content": context},
+            ],
+            temperature=0.9,
+            max_tokens=300,
             timeout=15.0,
         )
-        response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"].strip()
         return content
     except Exception as e:
         logger.warning(f"Agent summary generation failed: {e}, using fallback")

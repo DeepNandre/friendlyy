@@ -156,3 +156,92 @@ class TestRouterResponseParsing:
         result = _parse_router_response(content)
 
         assert result.confidence == 0.0
+
+    def test_parse_inbox_agent(self):
+        """Test parsing inbox agent classification."""
+        content = '{"agent": "inbox", "params": {"action": "check"}, "confidence": 0.95}'
+        result = _parse_router_response(content)
+
+        assert result.agent == AgentType.INBOX
+        assert result.confidence == 0.95
+
+
+class TestInboxClassification:
+    """Test inbox intent classification (positive and negative cases)."""
+
+    @pytest.mark.asyncio
+    async def test_classify_check_email(self, mock_settings, mock_nvidia_api):
+        """'check my email' → INBOX."""
+        mock_nvidia_api.post("https://integrate.api.nvidia.com/v1/chat/completions").mock(
+            return_value=Response(
+                200,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "content": '{"agent": "inbox", "params": {"action": "check"}, "confidence": 0.95}'
+                            }
+                        }
+                    ]
+                },
+            )
+        )
+
+        result = await classify_intent("check my email")
+        assert result.agent == AgentType.INBOX
+
+    @pytest.mark.asyncio
+    async def test_classify_important_emails(self, mock_settings, mock_nvidia_api):
+        """'any important emails today?' → INBOX."""
+        mock_nvidia_api.post("https://integrate.api.nvidia.com/v1/chat/completions").mock(
+            return_value=Response(
+                200,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "content": '{"agent": "inbox", "params": {"action": "check", "timeframe": "today"}, "confidence": 0.95}'
+                            }
+                        }
+                    ]
+                },
+            )
+        )
+
+        result = await classify_intent("any important emails today?")
+        assert result.agent == AgentType.INBOX
+
+    @pytest.mark.asyncio
+    async def test_classify_whats_in_inbox(self, mock_settings, mock_nvidia_api):
+        """'what's in my inbox?' → INBOX."""
+        mock_nvidia_api.post("https://integrate.api.nvidia.com/v1/chat/completions").mock(
+            return_value=Response(
+                200,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "content": '{"agent": "inbox", "params": {"action": "check"}, "confidence": 0.90}'
+                            }
+                        }
+                    ]
+                },
+            )
+        )
+
+        result = await classify_intent("what's in my inbox?")
+        assert result.agent == AgentType.INBOX
+
+    def test_parse_email_me_quote_is_not_inbox(self):
+        """'email me the quote' should NOT be parsed as inbox."""
+        content = '{"agent": "blitz", "params": {"service": "plumber", "action": "quote"}, "confidence": 0.90}'
+        result = _parse_router_response(content)
+
+        assert result.agent != AgentType.INBOX
+
+    def test_parse_send_email_is_not_inbox(self):
+        """'send an email to John' should NOT be parsed as inbox."""
+        content = '{"agent": "chat", "params": {"type": "email_request"}, "confidence": 0.85}'
+        result = _parse_router_response(content)
+
+        assert result.agent != AgentType.INBOX

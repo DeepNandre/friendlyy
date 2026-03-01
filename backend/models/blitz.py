@@ -142,6 +142,10 @@ class ChatRequest(BaseModel):
         default=False,
         description="Enable web search for responses (future use)",
     )
+    entity_id: Optional[str] = Field(
+        default=None,
+        description="Composio entity ID for user-scoped integrations (e.g. Gmail)",
+    )
 
     @field_validator("message")
     @classmethod

@@ -17,7 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from core import settings
 from core.http_client import http_client_lifespan, close_http_client
 from core.redis_client import close_redis_client
-from api import chat_router, blitz_router, build_router, stream_router, webhooks_router, queue_router, traces_router
+from api import chat_router, blitz_router, build_router, stream_router, webhooks_router, queue_router, traces_router, inbox_router
 from services.weave_tracing import load_traces_from_redis
 
 # Configure logging
@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Twilio configured: {bool(settings.twilio_account_sid)}")
     logger.info(f"ElevenLabs configured: {bool(settings.elevenlabs_api_key)}")
     logger.info(f"Google Places configured: {bool(settings.google_places_api_key)}")
+    logger.info(f"Composio configured: {bool(settings.composio_api_key)}")
 
     # Initialize W&B Weave if configured
     if settings.wandb_api_key:
@@ -103,6 +104,7 @@ app.include_router(stream_router, prefix="/api/blitz", tags=["stream"])
 app.include_router(webhooks_router, prefix="/api/blitz", tags=["webhooks"])
 app.include_router(build_router, prefix="/api/build", tags=["build"])
 app.include_router(queue_router, prefix="/api/queue", tags=["queue"])
+app.include_router(inbox_router, prefix="/api/inbox", tags=["inbox"])
 app.include_router(traces_router, prefix="/api", tags=["traces"])
 
 
@@ -279,6 +281,7 @@ async def api_root():
             "GET /api/blitz/session/{session_id}": "Get session status",
             "GET /api/build/stream/{session_id}": "Stream real-time build updates",
             "GET /api/build/preview/{preview_id}": "View generated website preview",
+            "GET /api/inbox/stream/{session_id}": "Stream real-time inbox check updates",
             "GET /api/queue/session/{session_id}": "Get queue session status",
             "POST /api/queue/cancel/{session_id}": "Cancel a queue hold wait",
             "GET /api/traces": "Traces dashboard (performance, improvement, recent)",

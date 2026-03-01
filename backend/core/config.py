@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # Mistral API (Devstral for agentic VibeCoder)
     mistral_api_key: str = ""
 
+    # Composio (Gmail integration)
+    composio_api_key: str = ""
+
     # W&B Weave
     wandb_api_key: str = ""
     weave_project: str = "friendly-blitz"
