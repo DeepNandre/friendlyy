@@ -18,7 +18,7 @@ import {
   FileText,
   Mail,
 } from 'lucide-react';
-import { useBlitzStream, CallStatusType } from '../hooks/useBlitzStream';
+import { useBlitzStream, CallStatusType, TranscriptEntry } from '../hooks/useBlitzStream';
 import { useBuildStream } from '../hooks/useBuildStream';
 import { useInboxStream, InboxSummary } from '../hooks/useInboxStream';
 import { InboxPreviewCard } from '../components/chat/InboxPreviewCard';
@@ -78,6 +78,7 @@ interface Message {
   agent?: AgentType;
   sessionId?: string;
   callStatuses?: CallStatus[];
+  transcripts?: TranscriptEntry[];
   isThinking?: boolean;
   thinkingTime?: number;
   previewUrl?: string;
@@ -209,7 +210,13 @@ export default function AIChat() {
         else if (stream.sessionStatus === 'calling') content = `Found ${stream.callStatuses.length} businesses. Making calls now...`;
         else if (stream.sessionStatus === 'complete' && stream.summary) content = stream.summary;
         else if (stream.sessionStatus === 'error') content = stream.error || 'Something went wrong.';
-        return { ...msg, content, isThinking: false, callStatuses: mappedStatuses.length > 0 ? mappedStatuses : msg.callStatuses };
+        return {
+          ...msg,
+          content,
+          isThinking: false,
+          callStatuses: mappedStatuses.length > 0 ? mappedStatuses : msg.callStatuses,
+          transcripts: stream.transcripts.length > 0 ? stream.transcripts : msg.transcripts,
+        };
       })
     );
 
@@ -636,6 +643,43 @@ export default function AIChat() {
                                   );
                                 })}
                               </div>
+
+                              {/* Live Transcript Section */}
+                              {message.transcripts && message.transcripts.length > 0 && (
+                                <div className="border-t border-gray-200/80">
+                                  <div className="px-4 py-2 bg-white/30 backdrop-blur-sm border-b border-gray-200/60">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                      <span className="text-[13px] font-medium text-gray-700">Live Conversation</span>
+                                    </div>
+                                  </div>
+                                  <div className="max-h-48 overflow-y-auto px-4 py-3 bg-white/20 space-y-2">
+                                    {message.transcripts.map((entry, idx) => (
+                                      <div
+                                        key={idx}
+                                        className={`flex ${entry.speaker === 'ai' ? 'justify-start' : 'justify-end'}`}
+                                      >
+                                        <div
+                                          className={`max-w-[85%] px-3 py-2 rounded-2xl text-[13px] ${
+                                            entry.speaker === 'ai'
+                                              ? 'bg-white border border-gray-200/80 text-gray-800'
+                                              : entry.speaker === 'human'
+                                              ? 'bg-[#007AFF] text-white'
+                                              : entry.speaker === 'error'
+                                              ? 'bg-red-100 text-red-700 border border-red-200'
+                                              : 'bg-gray-100 text-gray-600 text-center w-full'
+                                          }`}
+                                        >
+                                          {entry.speaker === 'system' && (
+                                            <span className="text-[11px] text-gray-400 mr-1.5">System:</span>
+                                          )}
+                                          {entry.text}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}

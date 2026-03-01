@@ -177,6 +177,9 @@ def generate_twiml(
     session_id: str,
     call_id: str,
     use_elevenlabs: bool = True,
+    use_conversation_mode: bool = False,
+    service_type: str = "service",
+    timeframe: str = "soon",
 ) -> str:
     """
     Generate TwiML for a call.
@@ -184,38 +187,60 @@ def generate_twiml(
     Single function per approved plan - handles both ElevenLabs and Twilio TTS.
 
     Args:
-        script_text: What the AI should say
+        script_text: What the AI should say (used in non-conversation mode)
         session_id: Session ID for callbacks
         call_id: Call ID for callbacks
         use_elevenlabs: If True, use ElevenLabs TTS; else use Twilio's built-in
+        use_conversation_mode: If True, use Media Streams + ElevenLabs Conversational AI
+        service_type: Type of service being requested (for conversation context)
+        timeframe: When service is needed (for conversation context)
 
     Returns:
         TwiML XML string
     """
     response = VoiceResponse()
 
-    if use_elevenlabs:
-        # Play pre-generated ElevenLabs audio
-        tts_url = f"{settings.backend_url}/api/blitz/tts-audio/{session_id}/{call_id}"
-        response.play(tts_url)
+    if use_conversation_mode:
+        # Use Media Streams for real-time conversation with ElevenLabs
+        # Build WebSocket URL (wss:// for secure connection)
+        ws_url = settings.backend_url.replace("https://", "wss://").replace("http://", "ws://")
+        stream_url = f"{ws_url}/api/blitz/media-stream/{session_id}/{call_id}?service={service_type}&timeframe={timeframe}"
+
+        # Start bidirectional media stream
+        start = response.start()
+        start.stream(
+            url=stream_url,
+            track="both_tracks",  # Capture both inbound and outbound audio
+        )
+
+        # Keep the call alive while streaming
+        # The stream will handle the conversation
+        response.pause(length=120)  # Max 2 minutes per call
+
     else:
-        # Use Twilio's built-in TTS (fallback)
-        response.say(script_text, voice="Polly.Amy", language="en-GB")
+        # Original simple mode: Play script, record response
+        if use_elevenlabs:
+            # Play pre-generated ElevenLabs audio
+            tts_url = f"{settings.backend_url}/api/blitz/tts-audio/{session_id}/{call_id}"
+            response.play(tts_url)
+        else:
+            # Use Twilio's built-in TTS (fallback)
+            response.say(script_text, voice="Polly.Amy", language="en-GB")
 
-    # Pause before recording
-    response.pause(length=1)
+        # Pause before recording
+        response.pause(length=1)
 
-    # Record the response (max 30 seconds, 5 second silence timeout)
-    response.record(
-        max_length=30,
-        timeout=5,  # 5 second silence detection per approved plan
-        action=f"{settings.backend_url}/api/blitz/recording-complete?session_id={session_id}&call_id={call_id}",
-        play_beep=True,
-        trim="trim-silence",
-    )
+        # Record the response (max 30 seconds, 5 second silence timeout)
+        response.record(
+            max_length=30,
+            timeout=5,  # 5 second silence detection per approved plan
+            action=f"{settings.backend_url}/api/blitz/recording-complete?session_id={session_id}&call_id={call_id}",
+            play_beep=True,
+            trim="trim-silence",
+        )
 
-    # Thank them
-    response.say("Thank you for your time. Goodbye!", voice="Polly.Amy", language="en-GB")
+        # Thank them
+        response.say("Thank you for your time. Goodbye!", voice="Polly.Amy", language="en-GB")
 
     return str(response)
 

@@ -60,15 +60,22 @@ async def get_twiml(session_id: str, call_id: str):
         logger.error(f"Call not found: {call_id}")
         raise HTTPException(status_code=404, detail="Call not found")
 
-    # Generate script text
+    # Get service details
+    service_type = session.parsed_params.service or "service"
+    timeframe = session.parsed_params.timeframe or "soon"
+
+    # Generate script text (for non-conversation mode)
     script_text = generate_call_script_text(
-        service_type=session.parsed_params.service or "service",
-        timeframe=session.parsed_params.timeframe,
+        service_type=service_type,
+        timeframe=timeframe,
         question="availability and call-out fee",
     )
 
-    # Check if ElevenLabs audio exists
+    # Check if conversation mode is available (requires ElevenLabs Agent ID)
+    use_conversation_mode = bool(settings.elevenlabs_agent_id)
     use_elevenlabs = bool(settings.elevenlabs_api_key)
+
+    logger.info(f"TwiML for {session_id}/{call_id}: conversation_mode={use_conversation_mode}, elevenlabs_tts={use_elevenlabs}")
 
     # Generate TwiML
     twiml = generate_twiml(
@@ -76,6 +83,9 @@ async def get_twiml(session_id: str, call_id: str):
         session_id=session_id,
         call_id=call_id,
         use_elevenlabs=use_elevenlabs,
+        use_conversation_mode=use_conversation_mode,
+        service_type=service_type,
+        timeframe=timeframe,
     )
 
     return Response(content=twiml, media_type="application/xml")

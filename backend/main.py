@@ -17,7 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from core import settings
 from core.http_client import http_client_lifespan, close_http_client
 from core.redis_client import close_redis_client
-from api import chat_router, blitz_router, build_router, stream_router, webhooks_router, queue_router, traces_router, inbox_router
+from api import chat_router, blitz_router, build_router, stream_router, webhooks_router, queue_router, traces_router, inbox_router, media_stream_router
 from services.weave_tracing import load_traces_from_redis
 
 # Configure logging
@@ -44,6 +44,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"CORS origins: {settings.cors_origins_list}")
     logger.info(f"Twilio configured: {bool(settings.twilio_account_sid)}")
     logger.info(f"ElevenLabs configured: {bool(settings.elevenlabs_api_key)}")
+    logger.info(f"ElevenLabs Agent ID: {settings.elevenlabs_agent_id[:8] + '...' if settings.elevenlabs_agent_id else 'Not set'}")
     logger.info(f"Google Places configured: {bool(settings.google_places_api_key)}")
     logger.info(f"Composio configured: {bool(settings.composio_api_key)}")
 
@@ -105,6 +106,7 @@ app.include_router(webhooks_router, prefix="/api/blitz", tags=["webhooks"])
 app.include_router(build_router, prefix="/api/build", tags=["build"])
 app.include_router(queue_router, prefix="/api/queue", tags=["queue"])
 app.include_router(inbox_router, prefix="/api/inbox", tags=["inbox"])
+app.include_router(media_stream_router, prefix="/api/blitz", tags=["media-stream"])
 app.include_router(traces_router, prefix="/api", tags=["traces"])
 
 

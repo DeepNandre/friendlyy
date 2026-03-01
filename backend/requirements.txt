@@ -14,6 +14,9 @@ redis>=5.0.1
 # Twilio
 twilio>=8.12.0
 
+# WebSockets (for Twilio Media Streams + ElevenLabs)
+websockets>=12.0
+
 # Rate limiting
 slowapi>=0.1.9
 

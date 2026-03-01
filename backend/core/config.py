@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # ElevenLabs
     elevenlabs_api_key: str = ""
+    elevenlabs_agent_id: str = ""  # For Conversational AI (create at elevenlabs.io/agents)
 
     # Google Places
     google_places_api_key: str = ""

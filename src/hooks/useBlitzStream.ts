@@ -26,11 +26,19 @@ export interface CallStatus {
   error?: string;
 }
 
+export interface TranscriptEntry {
+  callId: string;
+  speaker: "ai" | "human" | "system" | "error";
+  text: string;
+  timestamp: string;
+}
+
 export interface BlitzStreamState {
   isConnected: boolean;
   sessionStatus: "idle" | "searching" | "calling" | "complete" | "error";
   callStatuses: CallStatus[];
   businesses: Array<{ name: string; phone: string; address?: string; rating?: number }>;
+  transcripts: TranscriptEntry[];
   summary: string | null;
   error: string | null;
 }
@@ -73,6 +81,7 @@ export function useBlitzStream(sessionId: string | null) {
     sessionStatus: "idle",
     callStatuses: [],
     businesses: [],
+    transcripts: [],
     summary: null,
     error: null,
   });
@@ -181,6 +190,21 @@ export function useBlitzStream(sessionId: string | null) {
       }));
     });
 
+    // Handle live transcript events
+    eventSource.addEventListener("transcript", (e) => {
+      const data = JSON.parse(e.data);
+      const entry: TranscriptEntry = {
+        callId: data.call_id,
+        speaker: data.speaker,
+        text: data.text,
+        timestamp: data.timestamp,
+      };
+      setState((prev) => ({
+        ...prev,
+        transcripts: [...prev.transcripts, entry],
+      }));
+    });
+
     // Handle session_complete — preserve metadata from existing statuses
     eventSource.addEventListener("session_complete", (e) => {
       const data = JSON.parse(e.data);
@@ -243,6 +267,7 @@ export function useBlitzStream(sessionId: string | null) {
       sessionStatus: "idle",
       callStatuses: [],
       businesses: [],
+      transcripts: [],
       summary: null,
       error: null,
     });
