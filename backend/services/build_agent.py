@@ -1,15 +1,16 @@
 """
-Build agent - generates websites from natural language descriptions.
+Build agent - generates websites using Devstral agentic approach.
 
-Uses Mistral (via NVIDIA NIM) to generate HTML/CSS, then serves
-a preview. Streams progress events via Redis SSE queue.
+Uses Mistral's Devstral model with tool calling for agentic code generation.
+Supports iterative building and multi-turn conversations.
 """
 
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from core import get_http_client, settings
 from core.redis_client import save_session, get_redis_client
@@ -17,26 +18,118 @@ from core.sse import emit_event
 
 logger = logging.getLogger(__name__)
 
+# API endpoints
+MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
 NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 
-BUILD_SYSTEM_PROMPT = """You are a world-class web developer. Generate a complete, beautiful, single-page HTML website based on the user's description.
+# Devstral model for agentic coding
+DEVSTRAL_MODEL = "devstral-small-latest"
 
-Rules:
-- Output ONLY the raw HTML. No markdown, no code blocks, no explanation.
-- Include all CSS inline in a <style> tag in the <head>.
-- Use modern CSS (flexbox, grid, gradients, shadows, smooth transitions).
-- Make it fully responsive and mobile-friendly.
-- Use a polished, professional color palette appropriate for the business type.
-- Include realistic placeholder content (text, sections, calls-to-action).
-- Add subtle animations (fade-in, hover effects) using CSS only.
-- Use Google Fonts via CDN link for beautiful typography.
-- Include a hero section, features/services section, and a footer at minimum.
-- Use emoji or unicode icons where appropriate instead of external icon libraries.
-- Make the page look like a real, production-quality website.
-- The HTML should be complete and self-contained (no external JS dependencies).
-- Do NOT use any JavaScript.
+# System prompt for agentic web development
+DEVSTRAL_SYSTEM_PROMPT = """You are an expert web developer AI agent. Your task is to build beautiful, production-quality websites based on user descriptions.
 
-Output the complete HTML document starting with <!DOCTYPE html>."""
+You have access to these tools:
+- create_file: Create a new file with the given content
+- update_file: Update/replace the content of an existing file
+- finish_build: Complete the build and show the preview
+
+WORKFLOW:
+1. Analyze the user's request carefully
+2. Plan your approach (what pages/components needed)
+3. Use create_file to create the HTML file with embedded CSS
+4. If changes are needed, use update_file
+5. When done, call finish_build with a summary
+
+RULES:
+- Create a single index.html file with all CSS inline in a <style> tag
+- Use modern CSS (flexbox, grid, gradients, shadows, smooth transitions)
+- Make it fully responsive and mobile-friendly
+- Use a polished, professional color palette appropriate for the business type
+- Include realistic placeholder content (text, sections, calls-to-action)
+- Add subtle CSS animations (fade-in, hover effects)
+- Use Google Fonts via CDN for beautiful typography
+- Include hero section, features/services section, and footer at minimum
+- Use emoji or unicode icons instead of external icon libraries
+- The HTML should be complete and self-contained (no external JS dependencies)
+- Do NOT use any JavaScript
+
+Always think step-by-step before creating files."""
+
+# Tool definitions for Devstral
+DEVSTRAL_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "create_file",
+            "description": "Create a new file with the specified content. Use this to create the initial HTML/CSS for the website.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string",
+                        "description": "Name of the file to create (e.g., 'index.html')"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The complete content of the file"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Brief description of what this file does"
+                    }
+                },
+                "required": ["filename", "content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_file",
+            "description": "Update an existing file with new content. Use this to make changes to previously created files.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string",
+                        "description": "Name of the file to update"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The new complete content of the file"
+                    },
+                    "changes": {
+                        "type": "string",
+                        "description": "Brief description of what was changed"
+                    }
+                },
+                "required": ["filename", "content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "finish_build",
+            "description": "Complete the build process and show the preview. Call this when the website is ready.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "summary": {
+                        "type": "string",
+                        "description": "Brief summary of what was built"
+                    },
+                    "features": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of key features in the website"
+                    }
+                },
+                "required": ["summary"]
+            }
+        }
+    }
+]
 
 CLARIFICATION_KEYWORDS = [
     "build something",
@@ -63,23 +156,408 @@ def _needs_clarification(message: str) -> bool:
     return any(kw in msg_lower for kw in CLARIFICATION_KEYWORDS)
 
 
-async def _generate_site_html(description: str) -> str:
-    """Generate website HTML using Mistral via NVIDIA NIM."""
+class AgenticBuilder:
+    """Agentic website builder using Devstral with tool calling."""
+
+    def __init__(self, session_id: str):
+        self.session_id = session_id
+        self.files: Dict[str, str] = {}  # filename -> content
+        self.messages: List[Dict[str, Any]] = []
+        self.is_complete = False
+        self.summary = ""
+        self.features: List[str] = []
+
+    async def _call_devstral(self) -> Dict[str, Any]:
+        """Make a call to Devstral API with tool support."""
+        client = await get_http_client()
+
+        # Use Mistral API if key is available, otherwise fall back to NVIDIA NIM
+        if settings.mistral_api_key:
+            api_url = MISTRAL_API_URL
+            headers = {
+                "Authorization": f"Bearer {settings.mistral_api_key}",
+                "Content-Type": "application/json",
+            }
+            model = DEVSTRAL_MODEL
+        elif settings.nvidia_api_key:
+            # Fallback to NVIDIA NIM (without tool calling)
+            api_url = NVIDIA_API_URL
+            headers = {
+                "Authorization": f"Bearer {settings.nvidia_api_key}",
+                "Content-Type": "application/json",
+            }
+            model = "mistralai/mixtral-8x7b-instruct-v0.1"
+        else:
+            raise ValueError("No API key configured for Mistral or NVIDIA")
+
+        payload = {
+            "model": model,
+            "messages": self.messages,
+            "temperature": 0.7,
+            "max_tokens": 8192,
+        }
+
+        # Only add tools if using Mistral API (NVIDIA NIM doesn't support tools well)
+        if settings.mistral_api_key:
+            payload["tools"] = DEVSTRAL_TOOLS
+            payload["tool_choice"] = "auto"
+
+        logger.info(f"[BUILD] Calling {model} with {len(self.messages)} messages")
+
+        response = await client.post(
+            api_url,
+            headers=headers,
+            json=payload,
+            timeout=90.0,
+        )
+
+        if response.status_code != 200:
+            error_text = response.text[:500]
+            logger.error(f"[BUILD] API error {response.status_code}: {error_text}")
+            raise Exception(f"API error: {response.status_code}")
+
+        return response.json()
+
+    async def _handle_tool_call(self, tool_call: Dict[str, Any]) -> str:
+        """Execute a tool call and return the result."""
+        func_name = tool_call["function"]["name"]
+        args_str = tool_call["function"].get("arguments", "{}")
+
+        try:
+            args = json.loads(args_str)
+        except json.JSONDecodeError:
+            return f"Error: Invalid JSON arguments: {args_str[:100]}"
+
+        logger.info(f"[BUILD] Tool call: {func_name}({list(args.keys())})")
+
+        if func_name == "create_file":
+            filename = args.get("filename", "index.html")
+            content = args.get("content", "")
+            description = args.get("description", "")
+
+            self.files[filename] = content
+
+            await emit_event(
+                self.session_id,
+                "build_progress",
+                {
+                    "step": "generate",
+                    "message": f"Created {filename}" + (f": {description}" if description else ""),
+                    "file": filename,
+                },
+            )
+
+            return f"Successfully created {filename} ({len(content)} bytes)"
+
+        elif func_name == "update_file":
+            filename = args.get("filename", "index.html")
+            content = args.get("content", "")
+            changes = args.get("changes", "")
+
+            if filename not in self.files:
+                return f"Error: File {filename} does not exist. Use create_file first."
+
+            self.files[filename] = content
+
+            await emit_event(
+                self.session_id,
+                "build_progress",
+                {
+                    "step": "generate",
+                    "message": f"Updated {filename}" + (f": {changes}" if changes else ""),
+                    "file": filename,
+                },
+            )
+
+            return f"Successfully updated {filename}"
+
+        elif func_name == "finish_build":
+            self.summary = args.get("summary", "Website built successfully")
+            self.features = args.get("features", [])
+            self.is_complete = True
+
+            return "Build marked as complete. Generating preview..."
+
+        else:
+            return f"Unknown tool: {func_name}"
+
+    async def build(self, user_message: str, site_type: str = "website") -> Dict[str, Any]:
+        """Run the agentic build workflow."""
+        # Initialize conversation
+        self.messages = [
+            {"role": "system", "content": DEVSTRAL_SYSTEM_PROMPT},
+            {"role": "user", "content": f"Build a {site_type}: {user_message}"},
+        ]
+
+        # Emit build started event
+        await emit_event(
+            self.session_id,
+            "build_started",
+            {
+                "message": f"Building your {site_type} with AI...",
+                "steps": [
+                    {"id": "analyze", "label": "Analyzing requirements", "status": "in_progress"},
+                    {"id": "plan", "label": "Planning structure", "status": "pending"},
+                    {"id": "generate", "label": "Generating code", "status": "pending"},
+                    {"id": "polish", "label": "Final polish", "status": "pending"},
+                ],
+            },
+        )
+
+        await asyncio.sleep(0.5)
+
+        # Emit analyzing progress
+        await emit_event(
+            self.session_id,
+            "build_progress",
+            {
+                "step": "plan",
+                "message": "Planning your website structure...",
+                "completed_step": "analyze",
+            },
+        )
+
+        max_iterations = 10  # Prevent infinite loops
+        iteration = 0
+
+        while not self.is_complete and iteration < max_iterations:
+            iteration += 1
+            logger.info(f"[BUILD] Iteration {iteration}")
+
+            try:
+                result = await self._call_devstral()
+            except Exception as e:
+                logger.error(f"[BUILD] API call failed: {e}")
+                # If Mistral fails, try simple generation fallback
+                return await self._fallback_build(user_message, site_type)
+
+            choice = result.get("choices", [{}])[0]
+            message = choice.get("message", {})
+            finish_reason = choice.get("finish_reason")
+
+            # Check for tool calls
+            tool_calls = message.get("tool_calls", [])
+
+            if tool_calls:
+                # Add assistant message with tool calls to history
+                self.messages.append(message)
+
+                # Process each tool call
+                for tool_call in tool_calls:
+                    tool_result = await self._handle_tool_call(tool_call)
+
+                    # Add tool result to conversation
+                    self.messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.get("id", ""),
+                        "content": tool_result,
+                    })
+
+            elif message.get("content"):
+                # Model responded with text (no tools) - might be done
+                self.messages.append(message)
+
+                # If no files created yet but model finished, fall back to extracting HTML
+                if not self.files and finish_reason == "stop":
+                    content = message.get("content", "")
+                    if "<!DOCTYPE" in content or "<html" in content:
+                        # Model generated HTML directly
+                        self.files["index.html"] = content
+                        self.is_complete = True
+                    else:
+                        # Prompt model to create the file
+                        self.messages.append({
+                            "role": "user",
+                            "content": "Please create the HTML file using the create_file tool, then call finish_build."
+                        })
+                else:
+                    # Model is done with tool calls
+                    if self.files:
+                        self.is_complete = True
+            else:
+                # Empty response, try to continue
+                break
+
+        # If no files were created, use fallback
+        if not self.files:
+            return await self._fallback_build(user_message, site_type)
+
+        # Store the HTML in Redis
+        html = self.files.get("index.html", list(self.files.values())[0])
+        redis = await get_redis_client()
+        preview_id = str(uuid.uuid4())[:8]
+        await redis.setex(f"build:preview:{preview_id}", 3600, html)
+
+        preview_url = f"{settings.backend_url}/api/build/preview/{preview_id}"
+
+        # Emit completion
+        await emit_event(
+            self.session_id,
+            "build_progress",
+            {
+                "step": "polish",
+                "message": "Adding final touches...",
+                "completed_step": "generate",
+            },
+        )
+
+        await asyncio.sleep(0.3)
+
+        await emit_event(
+            self.session_id,
+            "build_complete",
+            {
+                "message": self.summary or f"Your {site_type} is ready!",
+                "preview_url": preview_url,
+                "preview_id": preview_id,
+                "features": self.features,
+                "completed_step": "polish",
+            },
+        )
+
+        # Save session state
+        await save_session(
+            self.session_id,
+            {
+                "id": self.session_id,
+                "type": "build",
+                "status": "complete",
+                "user_message": user_message,
+                "site_type": site_type,
+                "preview_url": preview_url,
+                "preview_id": preview_id,
+                "files": list(self.files.keys()),
+                "summary": self.summary,
+                "features": self.features,
+                "created_at": datetime.utcnow().isoformat(),
+            },
+        )
+
+        return {
+            "session_id": self.session_id,
+            "status": "complete",
+            "preview_url": preview_url,
+            "preview_id": preview_id,
+        }
+
+    async def _fallback_build(self, user_message: str, site_type: str) -> Dict[str, Any]:
+        """Fallback to simple generation if agentic approach fails."""
+        logger.info("[BUILD] Using fallback generation")
+
+        await emit_event(
+            self.session_id,
+            "build_progress",
+            {
+                "step": "generate",
+                "message": "Generating code...",
+                "completed_step": "plan",
+            },
+        )
+
+        # Use simple generation
+        if settings.nvidia_api_key or settings.mistral_api_key:
+            html = await _generate_site_html_simple(f"Create a {site_type}: {user_message}")
+        else:
+            html = _get_demo_html(site_type, user_message)
+
+        self.files["index.html"] = html
+
+        # Store and complete
+        redis = await get_redis_client()
+        preview_id = str(uuid.uuid4())[:8]
+        await redis.setex(f"build:preview:{preview_id}", 3600, html)
+
+        preview_url = f"{settings.backend_url}/api/build/preview/{preview_id}"
+
+        await emit_event(
+            self.session_id,
+            "build_progress",
+            {
+                "step": "polish",
+                "message": "Adding final touches...",
+                "completed_step": "generate",
+            },
+        )
+
+        await asyncio.sleep(0.3)
+
+        await emit_event(
+            self.session_id,
+            "build_complete",
+            {
+                "message": f"Your {site_type} is ready!",
+                "preview_url": preview_url,
+                "preview_id": preview_id,
+                "completed_step": "polish",
+            },
+        )
+
+        await save_session(
+            self.session_id,
+            {
+                "id": self.session_id,
+                "type": "build",
+                "status": "complete",
+                "user_message": user_message,
+                "site_type": site_type,
+                "preview_url": preview_url,
+                "preview_id": preview_id,
+                "created_at": datetime.utcnow().isoformat(),
+            },
+        )
+
+        return {
+            "session_id": self.session_id,
+            "status": "complete",
+            "preview_url": preview_url,
+            "preview_id": preview_id,
+        }
+
+
+async def _generate_site_html_simple(description: str) -> str:
+    """Simple HTML generation without tool calling (fallback)."""
     client = await get_http_client()
-    response = await client.post(
-        NVIDIA_API_URL,
-        headers={
+
+    simple_prompt = """You are a world-class web developer. Generate a complete, beautiful, single-page HTML website.
+
+Rules:
+- Output ONLY raw HTML. No markdown, no code blocks, no explanation.
+- Include all CSS inline in a <style> tag.
+- Use modern CSS (flexbox, grid, gradients, shadows).
+- Make it fully responsive.
+- Use Google Fonts via CDN.
+- Include hero, features, and footer sections.
+- Do NOT use JavaScript.
+
+Output the complete HTML starting with <!DOCTYPE html>."""
+
+    # Try Mistral first, then NVIDIA
+    if settings.mistral_api_key:
+        api_url = MISTRAL_API_URL
+        headers = {
+            "Authorization": f"Bearer {settings.mistral_api_key}",
+            "Content-Type": "application/json",
+        }
+        model = "mistral-small-latest"
+    else:
+        api_url = NVIDIA_API_URL
+        headers = {
             "Authorization": f"Bearer {settings.nvidia_api_key}",
             "Content-Type": "application/json",
-        },
+        }
+        model = "mistralai/mixtral-8x7b-instruct-v0.1"
+
+    response = await client.post(
+        api_url,
+        headers=headers,
         json={
-            "model": "mistralai/mixtral-8x7b-instruct-v0.1",
+            "model": model,
             "messages": [
-                {"role": "system", "content": BUILD_SYSTEM_PROMPT},
+                {"role": "system", "content": simple_prompt},
                 {"role": "user", "content": description},
             ],
             "temperature": 0.7,
-            "max_tokens": 4096,
+            "max_tokens": 8192,
         },
         timeout=60.0,
     )
@@ -90,9 +568,7 @@ async def _generate_site_html(description: str) -> str:
     # Strip markdown code fences if present
     if html.startswith("```"):
         lines = html.split("\n")
-        # Remove first line (```html or ```)
         lines = lines[1:]
-        # Remove last line if it's ```
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
         html = "\n".join(lines)
@@ -100,7 +576,7 @@ async def _generate_site_html(description: str) -> str:
     return html
 
 
-BUILD_TIMEOUT_SECONDS = 90
+BUILD_TIMEOUT_SECONDS = 120  # Increased for agentic workflow
 
 
 async def run_build_workflow(
@@ -109,20 +585,10 @@ async def run_build_workflow(
     session_id: Optional[str] = None,
 ) -> dict:
     """
-    Run the full build workflow with an overall timeout.
+    Run the agentic build workflow.
 
-    1. Validate the request (ask for clarification if too vague)
-    2. Stream progress events
-    3. Generate website HTML via Mistral
-    4. Store the result and emit completion event
-
-    Args:
-        user_message: Original user message
-        params: Parsed router params (service, notes)
-        session_id: Pre-created session ID
-
-    Returns:
-        Dict with build results
+    Uses Devstral with tool calling for iterative, agentic website building.
+    Falls back to simple generation if needed.
     """
     if not session_id:
         session_id = str(uuid.uuid4())
@@ -130,7 +596,7 @@ async def run_build_workflow(
     site_type = params.service or "website"
     notes = params.notes or user_message
 
-    # Clarification check runs outside the timeout (it's instant)
+    # Clarification check
     if _needs_clarification(user_message):
         await emit_event(
             session_id,
@@ -141,15 +607,13 @@ async def run_build_workflow(
         )
         return {"session_id": session_id, "status": "clarification_needed"}
 
-    # Build a rich description for the LLM
-    description = f"Create a {site_type}"
-    if notes:
-        description += f": {notes}"
-    description += f". Original request: \"{user_message}\""
+    # Build description
+    description = notes if notes != user_message else f"{site_type}: {user_message}"
 
     try:
+        builder = AgenticBuilder(session_id)
         return await asyncio.wait_for(
-            _execute_build(session_id, site_type, description, user_message),
+            builder.build(description, site_type),
             timeout=BUILD_TIMEOUT_SECONDS,
         )
 
@@ -170,120 +634,6 @@ async def run_build_workflow(
             {"message": "Something went wrong while building. Please try again."},
         )
         return {"session_id": session_id, "status": "error"}
-
-
-async def _execute_build(
-    session_id: str,
-    site_type: str,
-    description: str,
-    user_message: str,
-) -> dict:
-    """Core build logic wrapped by wait_for timeout."""
-    # Step 1: Build started
-    await emit_event(
-        session_id,
-        "build_started",
-        {
-            "message": f"Building your {site_type}...",
-            "steps": [
-                {"id": "analyze", "label": "Analyzing requirements", "status": "in_progress"},
-                {"id": "design", "label": "Designing layout", "status": "pending"},
-                {"id": "generate", "label": "Generating code", "status": "pending"},
-                {"id": "polish", "label": "Final polish", "status": "pending"},
-            ],
-        },
-    )
-
-    await asyncio.sleep(1.0)
-
-    # Step 2: Designing
-    await emit_event(
-        session_id,
-        "build_progress",
-        {
-            "step": "design",
-            "message": "Designing your layout and color scheme...",
-            "completed_step": "analyze",
-        },
-    )
-
-    await asyncio.sleep(0.8)
-
-    # Step 3: Generating code
-    await emit_event(
-        session_id,
-        "build_progress",
-        {
-            "step": "generate",
-            "message": "Generating HTML & CSS...",
-            "completed_step": "design",
-        },
-    )
-
-    # Actually generate the site
-    if settings.nvidia_api_key:
-        html = await _generate_site_html(description)
-    else:
-        html = _get_demo_html(site_type, description)
-
-    # Store the generated HTML in Redis
-    redis = await get_redis_client()
-    preview_id = str(uuid.uuid4())[:8]
-    await redis.setex(
-        f"build:preview:{preview_id}",
-        3600,  # 1 hour TTL
-        html,
-    )
-
-    # Step 4: Polish
-    await emit_event(
-        session_id,
-        "build_progress",
-        {
-            "step": "polish",
-            "message": "Adding final touches...",
-            "completed_step": "generate",
-        },
-    )
-
-    await asyncio.sleep(0.5)
-
-    # Build the preview URL
-    preview_url = f"{settings.backend_url}/api/build/preview/{preview_id}"
-
-    # Step 5: Complete
-    await emit_event(
-        session_id,
-        "build_complete",
-        {
-            "message": f"Your {site_type} is ready!",
-            "preview_url": preview_url,
-            "preview_id": preview_id,
-            "completed_step": "polish",
-        },
-    )
-
-    # Save session state
-    await save_session(
-        session_id,
-        {
-            "id": session_id,
-            "type": "build",
-            "status": "complete",
-            "user_message": user_message,
-            "site_type": site_type,
-            "preview_url": preview_url,
-            "preview_id": preview_id,
-            "created_at": datetime.utcnow().isoformat(),
-        },
-    )
-
-    return {
-        "session_id": session_id,
-        "status": "complete",
-        "preview_url": preview_url,
-        "preview_id": preview_id,
-    }
 
 
 def _get_demo_html(site_type: str, notes: str) -> str:

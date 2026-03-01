@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # NVIDIA NIM (Mistral)
     nvidia_api_key: str = ""
 
+    # Mistral API (Devstral for agentic VibeCoder)
+    mistral_api_key: str = ""
+
     # W&B Weave
     wandb_api_key: str = ""
     weave_project: str = "friendly-blitz"
