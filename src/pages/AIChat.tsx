@@ -17,9 +17,10 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useBlitzStream, CallStatusType } from '../hooks/useBlitzStream';
+import { useBuildStream } from '../hooks/useBuildStream';
 
 type MessageRole = 'user' | 'assistant';
-type AgentType = 'blitz' | 'vibecoder' | 'chat' | null;
+type AgentType = 'blitz' | 'build' | 'chat' | null;
 
 interface CallStatus {
   business: string;
@@ -28,6 +29,12 @@ interface CallStatus {
   status: 'pending' | 'ringing' | 'connected' | 'complete' | 'failed' | 'no_answer' | 'busy';
   result?: string;
   error?: string;
+}
+
+interface BuildStep {
+  id: string;
+  label: string;
+  status: 'pending' | 'in_progress' | 'complete' | 'error';
 }
 
 interface Message {
@@ -40,6 +47,8 @@ interface Message {
   callStatuses?: CallStatus[];
   isThinking?: boolean;
   thinkingTime?: number;
+  previewUrl?: string;
+  buildSteps?: BuildStep[];
 }
 
 const BLITZ_API_BASE =
@@ -51,10 +60,13 @@ export default function AIChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [activeBuildSessionId, setActiveBuildSessionId] = useState<string | null>(null);
+  const [activeBuildMessageId, setActiveBuildMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const stream = useBlitzStream(activeSessionId);
+  const buildStream = useBuildStream(activeBuildSessionId);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -90,6 +102,40 @@ export default function AIChat() {
       setActiveMessageId(null);
     }
   }, [stream, activeMessageId, activeSessionId]);
+
+  // Handle build stream updates
+  useEffect(() => {
+    if (!activeBuildMessageId || !activeBuildSessionId) return;
+
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== activeBuildMessageId) return msg;
+        let content = msg.content;
+        if (buildStream.buildStatus === 'building') {
+          content = buildStream.message || 'Building your site...';
+        } else if (buildStream.buildStatus === 'complete') {
+          content = `${buildStream.message || 'Your site is ready!'}\n\n[View Preview](${buildStream.previewUrl})`;
+        } else if (buildStream.buildStatus === 'clarification') {
+          content = buildStream.clarification || 'Could you tell me more about what you want to build?';
+        } else if (buildStream.buildStatus === 'error') {
+          content = buildStream.error || 'Something went wrong while building.';
+        }
+        return {
+          ...msg,
+          content,
+          isThinking: false,
+          previewUrl: buildStream.previewUrl,
+          buildSteps: buildStream.steps,
+        };
+      })
+    );
+
+    if (buildStream.buildStatus === 'complete' || buildStream.buildStatus === 'error' || buildStream.buildStatus === 'clarification') {
+      setIsLoading(false);
+      setActiveBuildSessionId(null);
+      setActiveBuildMessageId(null);
+    }
+  }, [buildStream, activeBuildMessageId, activeBuildSessionId]);
 
   const mapCallStatus = (status: CallStatusType): CallStatus['status'] => {
     switch (status) {
@@ -154,6 +200,9 @@ export default function AIChat() {
       if (data.agent === 'blitz' && data.session_id) {
         setActiveSessionId(data.session_id);
         setActiveMessageId(thinkingMessageId);
+      } else if (data.agent === 'build' && data.session_id) {
+        setActiveBuildSessionId(data.session_id);
+        setActiveBuildMessageId(thinkingMessageId);
       } else {
         setIsLoading(false);
       }
@@ -387,22 +436,74 @@ export default function AIChat() {
                         })()}
 
                         {/* VibeCoder Widget */}
-                        {message.agent === 'vibecoder' && (
-                          <div className="border border-border rounded-2xl bg-card overflow-hidden mt-1 shadow-sm">
-                            <div className="flex justify-between items-center px-4 py-3 bg-accent/20 border-b border-border">
+                        {message.agent === 'build' && (
+                          <div className="border border-border rounded-2xl bg-card overflow-hidden mt-3 shadow-sm">
+                            <div className="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-violet-500/10 to-purple-500/10 border-b border-border">
                               <div className="flex items-center gap-2">
-                                <div className="bg-foreground text-background p-1.5 rounded-lg">
+                                <div className="bg-gradient-to-br from-violet-500 to-purple-600 text-white p-1.5 rounded-lg">
                                   <Code size={13} />
                                 </div>
                                 <span className="font-semibold text-foreground text-sm font-sans">VibeCoder</span>
                               </div>
-                              <button className="text-xs text-foreground font-medium font-sans flex items-center gap-1 hover:opacity-70 transition-opacity">
-                                Open Editor <ChevronRight size={13} />
-                              </button>
+                              {message.previewUrl && (
+                                <a
+                                  href={message.previewUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-violet-600 font-medium font-sans flex items-center gap-1 hover:opacity-70 transition-opacity"
+                                >
+                                  View Preview <ExternalLink size={11} />
+                                </a>
+                              )}
                             </div>
-                            <div className="p-4 text-sm text-muted-foreground font-sans">
-                              Ready to build your project. Click to open the VibeCoder editor.
-                            </div>
+
+                            {/* Build Steps */}
+                            {message.buildSteps && message.buildSteps.length > 0 && (
+                              <div className="px-4 py-3 space-y-2">
+                                {message.buildSteps.map((step) => (
+                                  <div key={step.id} className="flex items-center gap-2">
+                                    {step.status === 'complete' ? (
+                                      <Check size={14} className="text-green-500" />
+                                    ) : step.status === 'in_progress' ? (
+                                      <Loader2 size={14} className="text-violet-500 animate-spin" />
+                                    ) : step.status === 'error' ? (
+                                      <X size={14} className="text-red-500" />
+                                    ) : (
+                                      <Clock size={14} className="text-muted-foreground" />
+                                    )}
+                                    <span className={`text-sm font-sans ${step.status === 'complete' ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                      {step.label}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Preview iframe */}
+                            {message.previewUrl && (
+                              <div className="border-t border-border">
+                                <iframe
+                                  src={message.previewUrl}
+                                  className="w-full h-64 bg-white"
+                                  title="Website Preview"
+                                />
+                              </div>
+                            )}
+
+                            {/* Actions */}
+                            {message.previewUrl && (
+                              <div className="flex items-center gap-2 px-4 py-3 border-t border-border">
+                                <a
+                                  href={message.previewUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-white font-sans font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 hover:opacity-90 transition-opacity"
+                                >
+                                  <ExternalLink size={11} />
+                                  Open Full Preview
+                                </a>
+                              </div>
+                            )}
                           </div>
                         )}
                       </>
