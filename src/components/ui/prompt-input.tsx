@@ -123,12 +123,65 @@ export function PromptInputTextarea({
       onKeyDown={handleKeyDown}
       disabled={disabled}
       className={cn(
-        "w-full resize-none border-0 bg-transparent px-4 py-3 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground min-h-[44px]",
+        "w-full resize-none border-0 bg-transparent px-4 py-3 text-base focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground min-h-[52px]",
         className
       )}
       rows={1}
       {...props}
     />
+  )
+}
+
+// Action chips row - like Le Chat's Canvas, Web search, Image generation
+export type PromptInputChipsProps = React.HTMLAttributes<HTMLDivElement>
+
+export function PromptInputChips({
+  children,
+  className,
+  ...props
+}: PromptInputChipsProps) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1 px-3 pb-3 flex-wrap",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+// Individual action chip with icon
+export type PromptInputChipProps = {
+  icon?: React.ReactNode
+  children: React.ReactNode
+  active?: boolean
+  className?: string
+} & React.ButtonHTMLAttributes<HTMLButtonElement>
+
+export function PromptInputChip({
+  icon,
+  children,
+  active = false,
+  className,
+  ...props
+}: PromptInputChipProps) {
+  return (
+    <button
+      className={cn(
+        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all",
+        active
+          ? "bg-accent text-accent-foreground"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted",
+        className
+      )}
+      {...props}
+    >
+      {icon}
+      <span>{children}</span>
+    </button>
   )
 }
 
@@ -142,7 +195,7 @@ export function PromptInputActions({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 px-3 pb-3",
+        "flex items-center gap-1 ml-auto",
         className
       )}
       {...props}
@@ -207,17 +260,42 @@ export function PromptInputSubmit({
   className,
 }: PromptInputSubmitProps) {
   const { isLoading, value, onSubmit, disabled } = usePromptInputContext()
+  const hasValue = value.trim().length > 0
 
   return (
     <button
       onClick={onSubmit}
-      disabled={disabled || !value.trim()}
+      disabled={disabled || !hasValue}
       className={cn(
-        "ml-auto bg-foreground hover:bg-foreground/90 disabled:bg-foreground/30 disabled:cursor-not-allowed text-background rounded-xl w-9 h-9 flex items-center justify-center shrink-0 transition-all",
+        "rounded-xl w-10 h-10 flex items-center justify-center shrink-0 transition-all",
+        hasValue && !disabled
+          ? "bg-orange-100 text-orange-600 hover:bg-orange-200"
+          : "text-muted-foreground/50 cursor-not-allowed",
         className
       )}
     >
       {isLoading ? loadingIcon : icon}
     </button>
+  )
+}
+
+// Bottom bar container for chips + actions
+export type PromptInputBottomBarProps = React.HTMLAttributes<HTMLDivElement>
+
+export function PromptInputBottomBar({
+  children,
+  className,
+  ...props
+}: PromptInputBottomBarProps) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between px-3 pb-3",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
   )
 }

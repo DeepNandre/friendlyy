@@ -14,7 +14,8 @@ import {
   MessageSquare,
   ExternalLink,
   Paperclip,
-  Mic,
+  Globe,
+  FileText,
 } from 'lucide-react';
 import { useBlitzStream, CallStatusType } from '../hooks/useBlitzStream';
 import { useBuildStream } from '../hooks/useBuildStream';
@@ -24,10 +25,15 @@ import { Steps, StepsTrigger, StepsContent, StepsItem } from '../components/ui/s
 import {
   PromptInput,
   PromptInputTextarea,
+  PromptInputBottomBar,
+  PromptInputChips,
+  PromptInputChip,
   PromptInputActions,
   PromptInputAction,
   PromptInputSubmit,
 } from '../components/ui/prompt-input';
+import { PromptSuggestion } from '../components/ui/prompt-suggestion';
+import { ModelSelector, MISTRAL_MODELS } from '../components/ui/model-selector';
 
 type MessageRole = 'user' | 'assistant';
 type AgentType = 'blitz' | 'build' | 'chat' | null;
@@ -71,6 +77,14 @@ interface Message {
 const BLITZ_API_BASE =
   import.meta.env.VITE_BLITZ_API_BASE || import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+// Prompt suggestions for the welcome screen
+const PROMPT_SUGGESTIONS = [
+  { text: 'Find me a plumber in London', icon: <Phone size={14} /> },
+  { text: 'Build a landing page for my startup', icon: <Code size={14} /> },
+  { text: 'Get quotes from 3 electricians', icon: <Sparkles size={14} /> },
+  { text: 'Create a restaurant menu website', icon: <FileText size={14} /> },
+];
+
 export default function AIChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -79,6 +93,8 @@ export default function AIChat() {
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [activeBuildSessionId, setActiveBuildSessionId] = useState<string | null>(null);
   const [activeBuildMessageId, setActiveBuildMessageId] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState('mixtral-8x7b');
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const stream = useBlitzStream(activeSessionId);
@@ -194,6 +210,8 @@ export default function AIChat() {
         body: JSON.stringify({
           message: messageText,
           conversation_history: conversationHistory,
+          model: selectedModel,
+          web_search: webSearchEnabled,
         }),
       });
       if (!response.ok) throw new Error('Failed');
@@ -233,14 +251,8 @@ export default function AIChat() {
     }
   };
 
-  const getStatusIcon = (status: CallStatus['status']) => {
-    switch (status) {
-      case 'pending': return <Clock size={15} />;
-      case 'ringing': return <Phone size={15} className="animate-pulse" />;
-      case 'connected': return <Loader2 size={15} className="animate-spin" />;
-      case 'complete': return <Check size={15} />;
-      default: return <X size={15} />;
-    }
+  const handleSuggestionClick = (text: string) => {
+    setInput(text);
   };
 
   const getStatusText = (status: CallStatus['status']) => {
@@ -298,20 +310,19 @@ export default function AIChat() {
                   I can help you find services, make calls, and build apps. What do you need?
                 </p>
               </div>
+
+              {/* Prompt Suggestions */}
               <div className="flex flex-wrap gap-2.5 justify-center mt-2">
-                {[
-                  { icon: <Phone size={13} />, label: 'Find a plumber', value: 'Find me a plumber who can come tomorrow' },
-                  { icon: <Code size={13} />, label: 'Build a landing page', value: 'Build me a landing page for my startup' },
-                  { icon: <Sparkles size={13} />, label: 'Get electrician quotes', value: 'Get quotes from 3 electricians in London' },
-                ].map((action) => (
-                  <button
-                    key={action.label}
-                    onClick={() => setInput(action.value)}
-                    className="bg-card hover:bg-muted border border-border px-4 py-2.5 rounded-full text-sm text-foreground font-sans font-medium transition-all hover:shadow-sm flex items-center gap-2"
+                {PROMPT_SUGGESTIONS.map((suggestion) => (
+                  <PromptSuggestion
+                    key={suggestion.text}
+                    onClick={() => handleSuggestionClick(suggestion.text)}
                   >
-                    <span className="text-muted-foreground">{action.icon}</span>
-                    {action.label}
-                  </button>
+                    <span className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{suggestion.icon}</span>
+                      {suggestion.text}
+                    </span>
+                  </PromptSuggestion>
                 ))}
               </div>
             </div>
@@ -543,12 +554,12 @@ export default function AIChat() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="h-28 shrink-0" />
+          <div className="h-36 shrink-0" />
         </div>
 
-        {/* Floating Input - Using PromptInput component */}
-        <div className="sticky bottom-0 bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-5 px-8 md:px-20 lg:px-36">
-          <div className="max-w-2xl mx-auto">
+        {/* Floating Input - Le Chat Style */}
+        <div className="sticky bottom-0 bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-4 px-8 md:px-20 lg:px-36">
+          <div className="max-w-2xl mx-auto space-y-4">
             <PromptInput
               value={input}
               onValueChange={setInput}
@@ -557,26 +568,53 @@ export default function AIChat() {
               maxHeight={200}
             >
               <PromptInputTextarea
-                placeholder="Ask me anything... Find services, build apps, get quotes"
+                placeholder="Ask Friendly or @mention an agent"
               />
-              <PromptInputActions>
-                <PromptInputAction tooltip="Attach file" side="top">
-                  <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
-                    <Paperclip size={16} />
-                  </button>
-                </PromptInputAction>
-                <PromptInputAction tooltip="Voice input" side="top">
-                  <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
-                    <Mic size={16} />
-                  </button>
-                </PromptInputAction>
-                <PromptInputSubmit
-                  icon={<ArrowRight size={16} />}
-                  loadingIcon={<Loader2 size={16} className="animate-spin" />}
-                />
-              </PromptInputActions>
+              <PromptInputBottomBar>
+                <PromptInputChips>
+                  <PromptInputChip
+                    icon={<Code size={14} />}
+                    onClick={() => setInput('Build me ')}
+                  >
+                    VibeCoder
+                  </PromptInputChip>
+                  <PromptInputChip
+                    icon={<Phone size={14} />}
+                    onClick={() => setInput('Find me a ')}
+                  >
+                    Call Agent
+                  </PromptInputChip>
+                  <PromptInputChip
+                    icon={<Globe size={14} />}
+                    active={webSearchEnabled}
+                    onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                  >
+                    Web search
+                  </PromptInputChip>
+                </PromptInputChips>
+                <PromptInputActions>
+                  <PromptInputAction tooltip="Attach file" side="top">
+                    <button className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground">
+                      <Paperclip size={18} />
+                    </button>
+                  </PromptInputAction>
+                  <PromptInputSubmit
+                    icon={<ArrowRight size={18} />}
+                    loadingIcon={<Loader2 size={18} className="animate-spin" />}
+                  />
+                </PromptInputActions>
+              </PromptInputBottomBar>
             </PromptInput>
-            <p className="text-center text-[11px] text-muted-foreground mt-2 font-sans">
+
+            {/* Model Selector */}
+            <ModelSelector
+              models={MISTRAL_MODELS}
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
+              className="pt-2"
+            />
+
+            <p className="text-center text-[11px] text-muted-foreground font-sans">
               Friendly AI can make mistakes. Verify important information.
             </p>
           </div>
