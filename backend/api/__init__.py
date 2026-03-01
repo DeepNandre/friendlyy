@@ -4,5 +4,6 @@ from .build import router as build_router
 from .stream import router as stream_router
 from .webhooks import router as webhooks_router
 from .queue import router as queue_router
+from .traces import router as traces_router
 
-__all__ = ["chat_router", "blitz_router", "build_router", "stream_router", "webhooks_router", "queue_router"]
+__all__ = ["chat_router", "blitz_router", "build_router", "stream_router", "webhooks_router", "queue_router", "traces_router"]

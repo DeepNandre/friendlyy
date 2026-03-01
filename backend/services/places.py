@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Any
 
 from core import get_http_client, settings
 from models import Business
+from services.weave_tracing import traced, log_business_search, get_trace_ctx
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,20 @@ FALLBACK_BUSINESSES: Dict[str, List[Business]] = {
 }
 
 
+def _log_search(*, result, duration, error, args, kwargs, ctx):
+    """Log callback for search_businesses."""
+    query = args[0] if args else kwargs.get("query", "")
+    location = kwargs.get("location") if len(args) < 2 else args[1]
+    log_business_search(
+        query=query,
+        location=location,
+        results_count=len(result) if result else 0,
+        duration=duration,
+        used_fallback=ctx.get("used_fallback", False),
+    )
+
+
+@traced("search_businesses", log_fn=_log_search)
 async def search_businesses(
     query: str,
     location: Optional[str] = None,
@@ -109,6 +124,7 @@ async def search_businesses(
     # Check for API key
     if not settings.google_places_api_key:
         logger.info("Google Places API key not set, using fallback")
+        get_trace_ctx()["used_fallback"] = True
         return _get_fallback_businesses(query, max_results)
 
     try:
@@ -116,10 +132,12 @@ async def search_businesses(
         if businesses:
             return businesses
         logger.info(f"No Places results for '{query}', using fallback")
+        get_trace_ctx()["used_fallback"] = True
         return _get_fallback_businesses(query, max_results)
 
     except Exception as e:
         logger.error(f"Places API error: {e}, using fallback")
+        get_trace_ctx()["used_fallback"] = True
         return _get_fallback_businesses(query, max_results)
 
 

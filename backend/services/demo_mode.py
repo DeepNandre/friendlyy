@@ -8,8 +8,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any
 
-from core.redis_client import save_session
-from core.sse import emit_event
+from core.redis_client import save_session, push_event
 from models import (
     BlitzSession,
     CallRecord,
@@ -18,6 +17,7 @@ from models import (
     RouterParams,
     Business,
 )
+from services.weave_tracing import traced, log_blitz_call, log_blitz_session, get_trace_ctx
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,53 @@ DEMO_RESULTS = [
 ]
 
 
+async def emit_demo_event(
+    session_id: str, event_type: str, data: Dict[str, Any]
+) -> None:
+    """Emit SSE event for demo session."""
+    await push_event(
+        session_id,
+        {
+            "event": event_type,
+            "data": data,
+            "timestamp": datetime.utcnow().isoformat(),
+        },
+    )
+
+
+def _log_demo_workflow(*, result, duration, error, args, kwargs, ctx):
+    """Log callback for run_demo_workflow — handles session-level trace."""
+    session = result
+    service_type = ctx.get("service_type", "service")
+    location = ctx.get("location", "London")
+    session_id = ctx.get("session_id", "unknown")
+
+    if error or not session:
+        log_blitz_session(
+            session_id=session_id,
+            total_calls=0,
+            successful_calls=0,
+            total_duration=duration,
+            service_type=service_type,
+            location=location,
+        )
+        return
+
+    successful = [
+        c for c in session.calls if c.status == CallStatus.COMPLETE and c.result
+    ]
+    log_blitz_session(
+        session_id=session.id,
+        total_calls=len(session.calls),
+        successful_calls=len(successful),
+        total_duration=duration,
+        service_type=service_type,
+        location=location,
+        best_quote=successful[0].result if successful else None,
+    )
+
+
+@traced("run_demo_workflow", log_fn=_log_demo_workflow)
 async def run_demo_workflow(
     user_message: str,
     params: RouterParams,
@@ -74,6 +121,11 @@ async def run_demo_workflow(
     """
     service = params.service or "plumber"
 
+    # Store context for log_fn callback
+    ctx = get_trace_ctx()
+    ctx["service_type"] = service
+    ctx["location"] = params.location or "London"
+
     # Create session with provided ID or generate new one
     session = BlitzSession(
         id=session_id if session_id else None,
@@ -86,12 +138,14 @@ async def run_demo_workflow(
     if session_id:
         session.id = session_id
 
+    ctx["session_id"] = session.id
+
     # Save initial state
     await save_session(session.id, session.model_dump(mode="json"))
 
     try:
         # Step 1: Simulate search
-        await emit_event(
+        await emit_demo_event(
             session.id,
             "status",
             {
@@ -112,7 +166,7 @@ async def run_demo_workflow(
 
         # Step 2: Start calls
         session.status = SessionStatus.CALLING
-        await emit_event(
+        await emit_demo_event(
             session.id,
             "status",
             {
@@ -130,7 +184,7 @@ async def run_demo_workflow(
             # Call starts ringing
             call.status = CallStatus.RINGING
             call.started_at = datetime.utcnow()
-            await emit_event(
+            await emit_demo_event(
                 session.id,
                 "call_started",
                 {
@@ -147,7 +201,7 @@ async def run_demo_workflow(
                 # Simulate no answer
                 call.status = CallStatus.NO_ANSWER
                 call.ended_at = datetime.utcnow()
-                await emit_event(
+                await emit_demo_event(
                     session.id,
                     "call_failed",
                     {
@@ -158,7 +212,7 @@ async def run_demo_workflow(
             else:
                 # Call connected
                 call.status = CallStatus.CONNECTED
-                await emit_event(
+                await emit_demo_event(
                     session.id,
                     "call_connected",
                     {
@@ -174,7 +228,7 @@ async def run_demo_workflow(
                 call.status = CallStatus.COMPLETE
                 call.result = result
                 call.ended_at = datetime.utcnow()
-                await emit_event(
+                await emit_demo_event(
                     session.id,
                     "call_result",
                     {
@@ -197,7 +251,7 @@ async def run_demo_workflow(
 
         # Final event
         await asyncio.sleep(0.5)
-        await emit_event(
+        await emit_demo_event(
             session.id,
             "session_complete",
             {
@@ -216,10 +270,28 @@ async def run_demo_workflow(
         # Save final state
         await save_session(session.id, session.model_dump(mode="json"))
 
+        # Log structured outcomes for each call (per-call logging stays here)
+        for call in session.calls:
+            call_duration = 0.0
+            if call.started_at and call.ended_at:
+                call_duration = (call.ended_at - call.started_at).total_seconds()
+            log_blitz_call(
+                business_name=call.business.name,
+                business_phone=call.business.phone,
+                call_success=call.status == CallStatus.COMPLETE and call.result is not None,
+                call_duration=call_duration,
+                ivr_navigated=False,
+                quote_received=None,
+                business_responded=call.status == CallStatus.COMPLETE,
+                result_text=call.result,
+                session_id=session.id,
+            )
+
+        # Session-level log is handled by _log_demo_workflow callback
         return session
 
     except Exception as e:
         logger.error(f"Demo workflow error: {e}")
         session.status = SessionStatus.ERROR
-        await emit_event(session.id, "error", {"message": str(e)})
+        await emit_demo_event(session.id, "error", {"message": str(e)})
         raise
